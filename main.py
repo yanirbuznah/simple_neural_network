@@ -70,9 +70,12 @@ class NeuralNetwork(object):
             numpy.random.shuffle(data_sets)
 
         for index, (sample, expected_result) in enumerate(data_sets):
-            if index % 100 == 0:
-                print(index)
+            if index % 10 == 0:
+                print('\r', end='')
+                print(f"{index}/{len(data_sets)}", end='')
             self._train_sample(sample, expected_result)
+
+        print(f"\r{len(data_sets)}/{len(data_sets)}")
 
     def validate_set(self, data_sets: List[Tuple[np.array, np.array]]):
         correct = 0
