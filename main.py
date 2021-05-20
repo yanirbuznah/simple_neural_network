@@ -1,19 +1,15 @@
+import shutil
 import sys
+import uuid
+from pathlib import Path
 from typing import Tuple, List
+from glob import glob
 
 import numpy.random
 import pandas as pd
 import numpy as np
 
-
-class ActivationFunction(object):
-    def __init__(self, f, d):
-        self.f = f
-        self.d = d
-
-
-ActivationFunction.ReLU = ActivationFunction(lambda a: np.maximum(0, a), lambda a: (a > 0).astype(int))
-ActivationFunction.Sigmoid = ActivationFunction(lambda a: 1/(1+np.exp(-a)), lambda a: a * (1-a))
+from config import *
 
 
 class NeuralLayer(object):
@@ -25,7 +21,6 @@ class NeuralLayer(object):
 
     def feed(self, values: np.array):
         self.feeded_values += values
-
 
     def clear_feeded_values(self):
         self.feeded_values = np.zeros(self.size)
@@ -93,16 +88,34 @@ class NeuralNetwork(object):
         print(f"Correct: {correction}%")
         return correction
 
+    def load_weights_and_biases(self, weight_files: List, biases_files: List):
+        for i, weights_file in enumerate(weight_files):
+            df = pd.read_csv(weights_file)
+            data = df.iloc[:, 1:].to_numpy()
+            self.weights[i] = data
+
+        for i, bias in enumerate(self.biases):
+            if bias is None:
+                continue
+
+            df = pd.read_csv(biases_files[i - 1])
+            data = df.iloc[:, 1:].to_numpy().flatten()
+            self.biases[i] = data
+
     def _train_sample(self, input_values: np.array, correct_output: np.array):
         self._clear_feeded_values()
         self._feed_forward(input_values)
         errors = self._calculate_errors(correct_output)
         self._update_weights(errors)
 
-    def _validate_sample(self, input_values: np.array, correct_output: np.array):
+    def classify_sample(self, input_values: np.array):
         self._clear_feeded_values()
         self._feed_forward(input_values)
         prediction = np.argmax(self.output_layer.feeded_values)
+        return prediction
+
+    def _validate_sample(self, input_values: np.array, correct_output: np.array):
+        prediction = self.classify_sample(input_values)
         correct = np.argmax(correct_output)
         print(prediction, correct, f"Certainty: {self.output_layer.feeded_values[prediction]}")
         return correct == prediction, self.output_layer.feeded_values[prediction]
@@ -122,18 +135,11 @@ class NeuralNetwork(object):
         for layer in self.layers[:-1][::-1]:
             self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(self.activation_function.f(layer.feeded_values), errors[layer.index + 1])
 
-
-        #self.weights[-1] += np.dot(output_layer_error, self.activation_function.d(self.output_layer.feeded_values))
-
-        #for b, l in zip(self.biases, self.num_layers):
-        #    a = d_sigmoid(np.dot(l, a)+b)
-        #return a
-
     def __str__(self):
         return f"Net[layers={','.join([str(layer.size) for layer in self.layers])}_randrange={self.randrange}]"
 
 
-def csv_to_train_data(path, count=-1) -> Tuple[np.array, np.array]:
+def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pd.read_csv(path, header=None)
     output = df.loc[:, 0]
     data = df.drop(columns=0).to_numpy()
@@ -152,51 +158,79 @@ def csv_to_train_data(path, count=-1) -> Tuple[np.array, np.array]:
     else:
         return data[:count], results[:count]
 
+
+def deep_copy_list_of_np_arrays(l: List[np.array]):
+    res = []
+    for arr in l:
+        if arr is None:
+            res.append(None)
+        else:
+            res.append(arr.copy())
+
+    return res
+
+
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         print("Not enough arguments")
         return
 
     train_csv = sys.argv[1]
     validate_csv = sys.argv[2]
+    test_csv = sys.argv[3] if len(sys.argv) >= 4 else None
 
-    print(f"Reading training data from: {train_csv}")
-    train_data, train_correct = csv_to_train_data(train_csv)
-    validate_data, validate_correct = csv_to_train_data(validate_csv)
-    #net = NeuralNetwork(len(train_data[0]), [int(np.floor((2/3)*train_data.shape[1])), int(np.floor((4/9)*train_data.shape[1]))], 10, ActivationFunction.ReLU, randrange=0.02, learning_rate=0.003)
+    net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
 
-    adaptive_learning_rate_setting = {
-         0: 0.003,
-        15: 0.001,
-        20: 0.0005
-    }
+    if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
+        print(f"Taking best values from {TRAINED_NET_DIR}")
+        weight_files = sorted(glob(f"{TRAINED_NET_DIR}/best_epoch*weights*.csv"))
+        biases_files = sorted(glob(f"{TRAINED_NET_DIR}/best_epoch*biases*.csv"))
+        net.load_weights_and_biases(weight_files, biases_files)
 
-    net = NeuralNetwork(len(train_data[0]), [1000, 1000], 10, ActivationFunction.ReLU, randrange=0.04, learning_rate=adaptive_learning_rate_setting[0])
+    if SHOULD_TRAIN:
+        print(f"Reading training data from: {train_csv}")
+        train_data, train_correct = csv_to_data(train_csv)
+        validate_data, validate_correct = csv_to_data(validate_csv)
+        print("Starting training...")
+        best_correct = 0
+        for i in range(EPOCH_COUNT):
+            if i in ADAPTIVE_LEARNING_RATE_SETTING:
+                net.lr = ADAPTIVE_LEARNING_RATE_SETTING[i]
 
-    max_correct = 0
-    for i in range(30):
-        #exp decay : lrate = initial_lrate * exp(-k*t)
-        #net.lr = 0.003* np.exp(-0.01*i)
+            print(f"Epoch {i}")
+            print(f"Current LR: {net.lr}")
+            net.train_set(list(zip(train_data, train_correct)), shuffle=True)
+            correct = net.validate_set(list(zip(validate_data, validate_correct)))
+            if correct > best_correct:
+                best_correct = correct
+                best_epoch = i
+                best_weights = deep_copy_list_of_np_arrays(net.weights)
+                best_biases = deep_copy_list_of_np_arrays(net.biases.copy())
 
-        if i in adaptive_learning_rate_setting:
-            net.lr = adaptive_learning_rate_setting[i]
+        print("Done!")
+        print("Saving weights and biases...")
+        output_path = Path(str(uuid.uuid4()))
+        output_path.mkdir()
+        shutil.copy2("config.py", output_path)
 
-        print(f"Epoch {i}")
-        print(f"Current LR: {net.lr}")
-        net.train_set(list(zip(train_data, train_correct)), shuffle=True)
-        correct = net.validate_set(list(zip(validate_data, validate_correct)))
-        if correct > max_correct:
-            max_correct = correct
-            max_epoch = i
-            max_weights = net.weights
+        for i, weight in enumerate(net.weights):
+            pd.DataFrame(weight).to_csv(output_path / f"{correct}%_weights_{i}.csv")
+        for i, bias in enumerate(net.biases):
+            if bias is not None:
+                pd.DataFrame(bias).to_csv(output_path / f"{correct}%_biases_{i}.csv")
 
-    print("Done!")
-    print("Saving weights...")
-    for i in range(len(net.weights)):
-        pd.DataFrame(net.weights[i]).to_csv(f"{correct}% adaptive_lr={adaptive_learning_rate_setting}_net={net} weights_{i}.csv")
-    for i in range(len(max_weights)):
-        pd.DataFrame(net.weights[i]).to_csv(f"max_epoch={max_epoch}_{max_correct}% % adaptive_lr={adaptive_learning_rate_setting}_net={net} weights_{i}.csv")
+        for i, weight in enumerate(best_weights):
+            pd.DataFrame(weight).to_csv(output_path / f"best_epoch={best_epoch}_{best_correct}%_weights_{i}.csv")
+        for i, bias in enumerate(best_biases):
+            if bias is not None:
+                pd.DataFrame(bias).to_csv(output_path / f"best_epoch={best_epoch}_{best_correct}%_biases_{i}.csv")
 
+    if test_csv:
+        print("Test csv provided. Classifying...")
+        train_data, _ = csv_to_data(test_csv)
+        for i, data in enumerate(train_data):
+            classification = net.classify_sample(data) + 1
+            print(f"{i}\t = \t {classification}")
 
 if __name__ == '__main__':
     main()
