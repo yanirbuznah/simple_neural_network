@@ -182,7 +182,7 @@ def main():
             net.lr = adaptive_learning_rate_setting[i]
 
         print(f"Epoch {i}")
-        print(f"Currect LR: {net.lr}")
+        print(f"Current LR: {net.lr}")
         net.train_set(list(zip(train_data, train_correct)), shuffle=True)
         correct = net.validate_set(list(zip(validate_data, validate_correct)))
         if correct > max_correct:
