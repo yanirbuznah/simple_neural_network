@@ -15,6 +15,8 @@ ADAPTIVE_LEARNING_RATE_SETTING = {
         20: 0.0005
 }
 
+TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE = True
+
 SHOULD_TRAIN = True
 
 TRAINED_NET_DIR = None  # Put None if you don't want to load a result dir

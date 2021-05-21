@@ -88,6 +88,10 @@ class NeuralNetwork(object):
         print(f"Correct: {correction}%")
         return correction
 
+    def set_weights_and_biases(self, weights, biases):
+        self.weights = weights
+        self.biases = biases
+
     def load_weights_and_biases(self, weight_files: List, biases_files: List):
         for i, weights_file in enumerate(weight_files):
             df = pd.read_csv(weights_file)
@@ -139,6 +143,25 @@ class NeuralNetwork(object):
         return f"Net[layers={','.join([str(layer.size) for layer in self.layers])}_randrange={self.randrange}]"
 
 
+class TrainingStateData(object):
+    def __init__(self, correct_percent, epoch, weights, biases):
+        self.correct_percent = correct_percent
+        self.epoch = epoch
+        self.weights = self.deep_copy_list_of_np_arrays(weights)
+        self.biases = self.deep_copy_list_of_np_arrays(biases)
+
+    @staticmethod
+    def deep_copy_list_of_np_arrays(l: List[np.array]):
+        res = []
+        for arr in l:
+            if arr is None:
+                res.append(None)
+            else:
+                res.append(arr.copy())
+
+        return res
+
+
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pd.read_csv(path, header=None)
     output = df.loc[:, 0]
@@ -159,15 +182,12 @@ def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
         return data[:count], results[:count]
 
 
-def deep_copy_list_of_np_arrays(l: List[np.array]):
-    res = []
-    for arr in l:
-        if arr is None:
-            res.append(None)
-        else:
-            res.append(arr.copy())
-
-    return res
+def save_state(path: Path, prefix, state: TrainingStateData):
+    for i, weight in enumerate(state.weights):
+        pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.correct_percent}%_weights_{i}.csv")
+    for i, bias in enumerate(state.biases):
+        if bias is not None:
+            pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.correct_percent}%_biases_{i}.csv")
 
 
 def main():
@@ -183,8 +203,8 @@ def main():
 
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
         print(f"Taking best values from {TRAINED_NET_DIR}")
-        weight_files = sorted(glob(f"{TRAINED_NET_DIR}/best_epoch*weights*.csv"))
-        biases_files = sorted(glob(f"{TRAINED_NET_DIR}/best_epoch*biases*.csv"))
+        weight_files = sorted(glob(f"{TRAINED_NET_DIR}/best_state*weights*.csv"))
+        biases_files = sorted(glob(f"{TRAINED_NET_DIR}/best_state*biases*.csv"))
         net.load_weights_and_biases(weight_files, biases_files)
 
     if SHOULD_TRAIN:
@@ -192,45 +212,45 @@ def main():
         train_data, train_correct = csv_to_data(train_csv)
         validate_data, validate_correct = csv_to_data(validate_csv)
         print("Starting training...")
-        best_correct = 0
-        for i in range(EPOCH_COUNT):
-            if i in ADAPTIVE_LEARNING_RATE_SETTING:
-                net.lr = ADAPTIVE_LEARNING_RATE_SETTING[i]
 
-            print(f"Epoch {i}")
+        current_correct_percent = 0
+        overall_best_state = TrainingStateData(0, 0, net.weights, net.biases)
+        lr_round_best_state = TrainingStateData(0, 0, net.weights, net.biases)
+
+        for epoch in range(EPOCH_COUNT):
+            if epoch in ADAPTIVE_LEARNING_RATE_SETTING:
+                net.lr = ADAPTIVE_LEARNING_RATE_SETTING[epoch]
+                if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE:
+                    print(f"Changing LR. Loading best from previous LR round: {lr_round_best_state.correct_percent}%")
+                    net.set_weights_and_biases(lr_round_best_state.weights, lr_round_best_state.biases)
+
+            print(f"Epoch {epoch}")
             print(f"Current LR: {net.lr}")
             net.train_set(list(zip(train_data, train_correct)), shuffle=True)
-            correct = net.validate_set(list(zip(validate_data, validate_correct)))
-            if correct > best_correct:
-                best_correct = correct
-                best_epoch = i
-                best_weights = deep_copy_list_of_np_arrays(net.weights)
-                best_biases = deep_copy_list_of_np_arrays(net.biases.copy())
+            current_correct_percent = net.validate_set(list(zip(validate_data, validate_correct)))
+            if current_correct_percent > overall_best_state.correct_percent:
+                overall_best_state = TrainingStateData(current_correct_percent, epoch, net.weights, net.biases)
+            if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE and current_correct_percent > lr_round_best_state.correct_percent:
+                lr_round_best_state = TrainingStateData(current_correct_percent, epoch, net.weights, net.biases)
 
         print("Done!")
         print("Saving weights and biases...")
         output_path = Path(str(uuid.uuid4()))
         output_path.mkdir()
         shutil.copy2("config.py", output_path)
-
-        for i, weight in enumerate(net.weights):
-            pd.DataFrame(weight).to_csv(output_path / f"{correct}%_weights_{i}.csv")
-        for i, bias in enumerate(net.biases):
-            if bias is not None:
-                pd.DataFrame(bias).to_csv(output_path / f"{correct}%_biases_{i}.csv")
-
-        for i, weight in enumerate(best_weights):
-            pd.DataFrame(weight).to_csv(output_path / f"best_epoch={best_epoch}_{best_correct}%_weights_{i}.csv")
-        for i, bias in enumerate(best_biases):
-            if bias is not None:
-                pd.DataFrame(bias).to_csv(output_path / f"best_epoch={best_epoch}_{best_correct}%_biases_{i}.csv")
+        save_state(output_path, "latest_state", TrainingStateData(current_correct_percent, epoch, net.weights, net.biases))
+        save_state(output_path, "best_state", overall_best_state)
 
     if test_csv:
         print("Test csv provided. Classifying...")
         train_data, _ = csv_to_data(test_csv)
-        for i, data in enumerate(train_data):
+        prediction_list = []
+        for epoch, data in enumerate(train_data):
             classification = net.classify_sample(data) + 1
-            print(f"{i}\t = \t {classification}")
+            print(f"{epoch}\t = \t {classification}")
+            prediction_list.append(classification)
+
+        print(prediction_list)
 
 if __name__ == '__main__':
     main()

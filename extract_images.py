@@ -1,7 +1,7 @@
 import sys
 
 import numpy as np
-from PIL import Image
+import cv2
 
 from main import csv_to_data
 
@@ -20,7 +20,11 @@ def main():
             classification = results[i].argmax() + 1
         else:
             classification = "all"
-        Image.fromarray(bmp_data.reshape((96, 32))).save(f"/tmp/test/{classification}/test_{i + 1}.bmp")
+
+        image = bmp_data.reshape(3, 32, 32).transpose(1, 2, 0)
+        image_cv = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(f"/tmp/test/{classification}/test_{i + 1}.bmp", image_cv)
+
     print()
 
 
