@@ -8,6 +8,7 @@ from glob import glob
 import numpy.random
 import pandas as pd
 import numpy as np
+import pickle
 
 from config import *
 
@@ -162,19 +163,46 @@ class TrainingStateData(object):
         return res
 
 
+def result_classifications_to_np_layers(results_classifications: List[int]) -> np.array:
+    results = np.zeros((len(results_classifications), 10))
+    for i in range(len(results_classifications)):
+        if not str(results_classifications[i]).isdigit():
+            # This is probably a test set. Ignore expected results column
+            results = []
+            break
+
+        results[i][results_classifications[i] - 1] = 1
+
+    return results
+
+
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pd.read_csv(path, header=None)
     output = df.loc[:, 0]
     data = df.drop(columns=0).to_numpy()
     results_indexes = output.to_numpy()
-    results = np.zeros((len(results_indexes), 10))
-    for i in range(len(results_indexes)):
-        if not str(results_indexes[i]).isdigit():
-            # This is probably a test set. Ignore expected results column
-            results = []
-            break
+    results = result_classifications_to_np_layers(results_indexes)
 
-        results[i][results_indexes[i] - 1] = 1
+    if count == -1:
+        return data, results
+    else:
+        return data[:count], results[:count]
+
+
+def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
+    results_indexes = []
+    data = []
+    pickle_files = sorted(glob(f"{path}/data_batch_*"))
+    for pickle_file in pickle_files:
+        with open(pickle_file, 'rb') as f:
+            data_dict = pickle.load(f, encoding='bytes')
+            results_indexes += data_dict[b'labels']
+            data += [data_dict[b'data']/255]
+
+    result_classifications = [i + 1 for i in results_indexes]
+    results = result_classifications_to_np_layers(result_classifications)
+
+    data = np.concatenate(data)
 
     if count == -1:
         return data, results
@@ -209,8 +237,16 @@ def main():
 
     if SHOULD_TRAIN:
         print(f"Reading training data from: {train_csv}")
-        train_data, train_correct = csv_to_data(train_csv)
+
+        # TO TAKE FROM CSV
+        #train_data, train_correct = csv_to_data(train_csv)
+
+        # TO TAKE FROM PICKLE
+        train_data, train_correct = pickle_to_data("cifar-10-batches-py")
+
+
         validate_data, validate_correct = csv_to_data(validate_csv)
+
         print("Starting training...")
 
         current_correct_percent = 0
