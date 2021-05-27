@@ -1,3 +1,4 @@
+import csv
 import shutil
 import sys
 import uuid
@@ -84,10 +85,11 @@ class NeuralNetwork(object):
                 correct += 1
             total += 1
 
-        print(f"Average Certainty: {float(certainty / total)}")
+        average_certainty = float(certainty / total)
+        print(f"Average Certainty: {average_certainty}")
         correction = float(correct / total) * 100.0
         print(f"Correct: {correction}%")
-        return correction
+        return correction, average_certainty
 
     def set_weights_and_biases(self, weights, biases):
         self.weights = weights
@@ -122,7 +124,7 @@ class NeuralNetwork(object):
     def _validate_sample(self, input_values: np.array, correct_output: np.array):
         prediction = self.classify_sample(input_values)
         correct = np.argmax(correct_output)
-        print(prediction, correct, f"Certainty: {self.output_layer.feeded_values[prediction]}")
+        #print(prediction, correct, f"Certainty: {self.output_layer.feeded_values[prediction]}")
         return correct == prediction, self.output_layer.feeded_values[prediction]
 
     def _calculate_errors(self, correct_output: np.array):
@@ -146,7 +148,7 @@ class NeuralNetwork(object):
 
 class TrainingStateData(object):
     def __init__(self, correct_percent, epoch, weights, biases):
-        self.correct_percent = correct_percent
+        self.accuracy = correct_percent
         self.epoch = epoch
         self.weights = self.deep_copy_list_of_np_arrays(weights)
         self.biases = self.deep_copy_list_of_np_arrays(biases)
@@ -212,10 +214,10 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
 
 def save_state(path: Path, prefix, state: TrainingStateData):
     for i, weight in enumerate(state.weights):
-        pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.correct_percent}%_weights_{i}.csv")
+        pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_weights_{i}.csv")
     for i, bias in enumerate(state.biases):
         if bias is not None:
-            pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.correct_percent}%_biases_{i}.csv")
+            pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_biases_{i}.csv")
 
 
 def main():
@@ -228,6 +230,7 @@ def main():
     test_csv = sys.argv[3] if len(sys.argv) >= 4 else None
 
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
+    csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
         print(f"Taking best values from {TRAINED_NET_DIR}")
@@ -239,17 +242,16 @@ def main():
         print(f"Reading training data from: {train_csv}")
 
         # TO TAKE FROM CSV
-        #train_data, train_correct = csv_to_data(train_csv)
+        train_data, train_correct = csv_to_data(train_csv)
 
         # TO TAKE FROM PICKLE
-        train_data, train_correct = pickle_to_data("cifar-10-batches-py")
-
+        #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
 
         validate_data, validate_correct = csv_to_data(validate_csv)
 
         print("Starting training...")
 
-        current_correct_percent = 0
+        current_validate_accuracy = 0
         overall_best_state = TrainingStateData(0, 0, net.weights, net.biases)
         lr_round_best_state = TrainingStateData(0, 0, net.weights, net.biases)
 
@@ -257,24 +259,36 @@ def main():
             if epoch in ADAPTIVE_LEARNING_RATE_SETTING:
                 net.lr = ADAPTIVE_LEARNING_RATE_SETTING[epoch]
                 if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE:
-                    print(f"Changing LR. Loading best from previous LR round: {lr_round_best_state.correct_percent}%")
+                    print(f"Changing LR. Loading best from previous LR round: {lr_round_best_state.accuracy}%")
                     net.set_weights_and_biases(lr_round_best_state.weights, lr_round_best_state.biases)
 
             print(f"Epoch {epoch}")
             print(f"Current LR: {net.lr}")
             net.train_set(list(zip(train_data, train_correct)), shuffle=True)
-            current_correct_percent = net.validate_set(list(zip(validate_data, validate_correct)))
-            if current_correct_percent > overall_best_state.correct_percent:
-                overall_best_state = TrainingStateData(current_correct_percent, epoch, net.weights, net.biases)
-            if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE and current_correct_percent > lr_round_best_state.correct_percent:
-                lr_round_best_state = TrainingStateData(current_correct_percent, epoch, net.weights, net.biases)
+
+            print("======= Train Accuracy =======")
+            current_train_accuracy, train_certainty = net.validate_set(list(zip(train_data, train_correct)))
+
+            print("======= Validate Accuracy =======")
+            current_validate_accuracy, validate_certainty = net.validate_set(list(zip(validate_data, validate_correct)))
+
+            csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
+
+            if current_validate_accuracy > overall_best_state.accuracy:
+                overall_best_state = TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases)
+            if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE and current_validate_accuracy > lr_round_best_state.accuracy:
+                lr_round_best_state = TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases)
 
         print("Done!")
-        print("Saving weights and biases...")
+        print("Saving results, weights and biases...")
         output_path = Path(str(uuid.uuid4()))
         output_path.mkdir()
         shutil.copy2("config.py", output_path)
-        save_state(output_path, "latest_state", TrainingStateData(current_correct_percent, epoch, net.weights, net.biases))
+        with open(output_path / "results.csv", 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(csv_results)
+
+        save_state(output_path, "latest_state", TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases))
         save_state(output_path, "best_state", overall_best_state)
 
     if test_csv:
