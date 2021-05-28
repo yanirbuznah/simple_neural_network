@@ -32,8 +32,9 @@ class NeuralLayer(object):
 
 
 class NeuralNetwork(object):
-    def __init__(self, input_layer_size: int, hidden_layers_sizes: List[int], output_layer_size: int, activation_function:ActivationFunction, learning_rate=0.001, randrange=0.01):
+    def __init__(self, input_layer_size: int, hidden_layers_sizes: List[int], output_layer_size: int, activation_function:ActivationFunction, learning_rate=0.001, randrange=0.01, use_softmax=False):
         self.input_layer = NeuralLayer(input_layer_size, 0)
+        self.use_softmax = use_softmax
         self.hidden_layers = [NeuralLayer(size, index + 1) for index, size in enumerate(hidden_layers_sizes)]
         self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes))
         self.randrange = randrange
@@ -48,17 +49,23 @@ class NeuralNetwork(object):
     def layers(self):
         return [self.input_layer] + self.hidden_layers + [self.output_layer]
 
+    def _activation_function_for_weights_index(self, weight_index):
+        if self.use_softmax and weight_index == len(self.weights) - 1:
+            return ActivationFunction.SoftMax
+        return self.activation_function
+
+
     def _clear_feeded_values(self):
         for layer in self.layers:
             layer.clear_feeded_values()
-
 
     def _feed_forward(self, input_values: np.array):
         self.input_layer.feed(input_values)
         for layer in self.hidden_layers + [self.output_layer]:
             prev_layer_index = layer.index - 1
             bias = self.biases[layer.index] if self.biases[layer.index] is not None else np.zeros(layer.size)
-            values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]) + bias)
+            activation_function = self._activation_function_for_weights_index(prev_layer_index)
+            values = activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]) + bias)
             layer.feed(values)
 
     def train_set(self, data_sets: List[Tuple[np.array, np.array]], shuffle=False):
@@ -130,6 +137,7 @@ class NeuralNetwork(object):
     def _calculate_errors(self, correct_output: np.array):
         errors = []
         prev_layer_error = correct_output - self.output_layer.feeded_values
+        prev_layer_error = prev_layer_error if not self.use_softmax else ActivationFunction.SoftMax.d(prev_layer_error)
         errors.insert(0, prev_layer_error)
         for layer in self.layers[:-1][::-1]:
             prev_layer_error = errors[0]
@@ -229,7 +237,7 @@ def main():
     validate_csv = sys.argv[2]
     test_csv = sys.argv[3] if len(sys.argv) >= 4 else None
 
-    net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
+    net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE, use_softmax=USE_SOFTMAX)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
