@@ -1,4 +1,6 @@
-from common import ActivationFunction
+import numpy as np
+
+from common import ActivationFunction, AdaptiveLearningRateMode
 
 # Neural Network Configuration
 INPUT_LAYER_SIZE = 3072
@@ -9,16 +11,19 @@ RANDRANGE = 0.04
 LEARNING_RATE = 0.003
 
 # Training Configuration
-EPOCH_COUNT = 35
-ADAPTIVE_LEARNING_RATE_SETTING = {
+EPOCH_COUNT = 1
+INPUT_LAYER_NOISE_PROB = 0.2
+SUBSET_SIZE = -1
+ADAPTIVE_LEARNING_RATE_MODE = AdaptiveLearningRateMode.FORMULA
+ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
+ADAPTIVE_LEARNING_RATE_DICT = {
         15: 0.001,
-        20: 0.0005,
-        25: 0.0001
+        20: 0.0006,
+        25: 0.0002,
+        50: 0.0001
 }
 
-TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE = False
+SHOULD_TRAIN = False
 
-SHOULD_TRAIN = True
-
-TRAINED_NET_DIR = None  # Put None if you don't want to load a result dir
+TRAINED_NET_DIR = "55e8906a-70c2-4fd6-9ffd-a261e305a4a1"  # Put None if you don't want to load a result dir
 

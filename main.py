@@ -1,17 +1,21 @@
 import csv
 import shutil
+import smtplib
+import ssl
 import sys
 import uuid
+from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Tuple, List
 from glob import glob
 
-import numpy.random
 import pandas as pd
 import numpy as np
 import pickle
 
 from config import *
+
+np.random.seed(6)
 
 
 class NeuralLayer(object):
@@ -19,7 +23,6 @@ class NeuralLayer(object):
         self.size = size
         self.index = index
         self.feeded_values = np.zeros(size)
-
 
     def feed(self, values: np.array):
         self.feeded_values += values
@@ -63,7 +66,7 @@ class NeuralNetwork(object):
 
     def train_set(self, data_sets: List[Tuple[np.array, np.array]], shuffle=False):
         if shuffle:
-            numpy.random.shuffle(data_sets)
+            np.random.shuffle(data_sets)
 
         for index, (sample, expected_result) in enumerate(data_sets):
 
@@ -153,6 +156,10 @@ class TrainingStateData(object):
         self.weights = self.deep_copy_list_of_np_arrays(weights)
         self.biases = self.deep_copy_list_of_np_arrays(biases)
 
+    def __str__(self):
+        return f"Epoch: {self.epoch}\nAccuracy: {self.accuracy}%"
+
+
     @staticmethod
     def deep_copy_list_of_np_arrays(l: List[np.array]):
         res = []
@@ -220,6 +227,35 @@ def save_state(path: Path, prefix, state: TrainingStateData):
             pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_biases_{i}.csv")
 
 
+def get_subset(train_data, train_correct, count):
+    random_rows_idx = np.random.choice(train_data.shape[0], size=count, replace=False)
+    return train_data[np.ix_(random_rows_idx)], train_correct[np.ix_(random_rows_idx)]
+
+
+def apply_noise(train_data, prob):
+    for i in train_data:
+        indices = np.random.choice(np.arange(i.size), replace=False,
+                                   size=int(i.size * prob))
+        i[indices] = 0
+    return train_data
+
+
+def send_mail(mail, message):
+    sender_email = "algobiotester@gmail.com"
+
+    msg = MIMEText(message, _charset="UTF-8")
+
+    port = 465  # For SSL
+    password = "algobio1!"
+
+    # Create a secure SSL context
+    context = ssl.create_default_context()
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
+        server.login(sender_email, password)
+        server.sendmail(sender_email, mail, msg.as_string())
+
+
 def main():
     if len(sys.argv) < 3:
         print("Not enough arguments")
@@ -231,6 +267,8 @@ def main():
 
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
+
+    output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
         print(f"Taking best values from {TRAINED_NET_DIR}")
@@ -244,8 +282,18 @@ def main():
         # TO TAKE FROM CSV
         train_data, train_correct = csv_to_data(train_csv)
 
-        # TO TAKE FROM PICKLE
+        # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
+
+        if INPUT_LAYER_NOISE_PROB > 0:
+            print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
+            train_data = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
+
+        if SUBSET_SIZE > 0:
+            subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
+            net.train_set(list(zip(subset_train, subset_correct)), shuffle=True)
+        else:
+            net.train_set(list(zip(train_data, train_correct)), shuffle=True)
 
         validate_data, validate_correct = csv_to_data(validate_csv)
 
@@ -253,14 +301,14 @@ def main():
 
         current_validate_accuracy = 0
         overall_best_state = TrainingStateData(0, 0, net.weights, net.biases)
-        lr_round_best_state = TrainingStateData(0, 0, net.weights, net.biases)
 
         for epoch in range(EPOCH_COUNT):
-            if epoch in ADAPTIVE_LEARNING_RATE_SETTING:
-                net.lr = ADAPTIVE_LEARNING_RATE_SETTING[epoch]
-                if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE:
-                    print(f"Changing LR. Loading best from previous LR round: {lr_round_best_state.accuracy}%")
-                    net.set_weights_and_biases(lr_round_best_state.weights, lr_round_best_state.biases)
+            if ADAPTIVE_LEARNING_RATE_MODE == AdaptiveLearningRateMode.FORMULA:
+                net.lr = ADAPTIVE_LEARNING_RATE_FORMULA(epoch)
+            elif ADAPTIVE_LEARNING_RATE_MODE == AdaptiveLearningRateMode.PREDEFINED_DICT:
+                net.lr = ADAPTIVE_LEARNING_RATE_DICT.get(epoch, default=net.lr)
+            else:
+                raise NotImplementedError("Unknown adaptive learning rate mode")
 
             print(f"Epoch {epoch}")
             print(f"Current LR: {net.lr}")
@@ -276,12 +324,9 @@ def main():
 
             if current_validate_accuracy > overall_best_state.accuracy:
                 overall_best_state = TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases)
-            if TAKE_BEST_PARAMS_ON_LEARNING_RATE_CHANGE and current_validate_accuracy > lr_round_best_state.accuracy:
-                lr_round_best_state = TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases)
 
         print("Done!")
         print("Saving results, weights and biases...")
-        output_path = Path(str(uuid.uuid4()))
         output_path.mkdir()
         shutil.copy2("config.py", output_path)
         with open(output_path / "results.csv", 'w', newline='') as f:
@@ -291,14 +336,24 @@ def main():
         save_state(output_path, "latest_state", TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases))
         save_state(output_path, "best_state", overall_best_state)
 
+        mail_content = f"Finished!\nbest state:\n {overall_best_state}\n CONFIG:\n{open('config.py', 'r').read()}"
+        send_mail("yanirbuznah@gmail.com", mail_content)
+        send_mail("ron.evenm@gmail.com", mail_content)
+
     if test_csv:
         print("Test csv provided. Classifying...")
         train_data, _ = csv_to_data(test_csv)
         prediction_list = []
-        for epoch, data in enumerate(train_data):
+        for i, data in enumerate(train_data):
             classification = net.classify_sample(data) + 1
-            print(f"{epoch}\t = \t {classification}")
             prediction_list.append(classification)
+
+        print("Saving predicted test.csv")
+        df = pd.read_csv(test_csv, header=None)
+        df.drop(columns=0, inplace=True)
+        df.insert(0, "", prediction_list)
+        df.to_csv(output_path/"test_filled.csv")
+
 
         print(prediction_list)
 
