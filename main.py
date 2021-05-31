@@ -17,6 +17,27 @@ from config import *
 
 np.random.seed(6)
 
+class TrainingStateData(object):
+    def __init__(self, correct_percent, epoch, weights, biases):
+        self.accuracy = correct_percent
+        self.epoch = epoch
+        self.weights = self.deep_copy_list_of_np_arrays(weights)
+        self.biases = self.deep_copy_list_of_np_arrays(biases)
+
+    def __str__(self):
+        return f"Epoch: {self.epoch}\nAccuracy: {self.accuracy}%"
+
+    @staticmethod
+    def deep_copy_list_of_np_arrays(l: List[np.array]):
+        res = []
+        for arr in l:
+            if arr is None:
+                res.append(None)
+            else:
+                res.append(arr.copy())
+
+        return res
+
 
 class NeuralLayer(object):
     def __init__(self, size: int, index: int):
@@ -98,20 +119,6 @@ class NeuralNetwork(object):
         self.weights = weights
         self.biases = biases
 
-    def load_weights_and_biases(self, weight_files: List, biases_files: List):
-        for i, weights_file in enumerate(weight_files):
-            df = pd.read_csv(weights_file)
-            data = df.iloc[:, 1:].to_numpy()
-            self.weights[i] = data
-
-        for i, bias in enumerate(self.biases):
-            if bias is None:
-                continue
-
-            df = pd.read_csv(biases_files[i - 1])
-            data = df.iloc[:, 1:].to_numpy().flatten()
-            self.biases[i] = data
-
     def _train_sample(self, input_values: np.array, correct_output: np.array):
         self._clear_feeded_values()
         self._feed_forward(input_values)
@@ -147,29 +154,6 @@ class NeuralNetwork(object):
 
     def __str__(self):
         return f"Net[layers={','.join([str(layer.size) for layer in self.layers])}_randrange={self.randrange}]"
-
-
-class TrainingStateData(object):
-    def __init__(self, correct_percent, epoch, weights, biases):
-        self.accuracy = correct_percent
-        self.epoch = epoch
-        self.weights = self.deep_copy_list_of_np_arrays(weights)
-        self.biases = self.deep_copy_list_of_np_arrays(biases)
-
-    def __str__(self):
-        return f"Epoch: {self.epoch}\nAccuracy: {self.accuracy}%"
-
-
-    @staticmethod
-    def deep_copy_list_of_np_arrays(l: List[np.array]):
-        res = []
-        for arr in l:
-            if arr is None:
-                res.append(None)
-            else:
-                res.append(arr.copy())
-
-        return res
 
 
 def result_classifications_to_np_layers(results_classifications: List[int]) -> np.array:
@@ -220,11 +204,42 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
 
 
 def save_state(path: Path, prefix, state: TrainingStateData):
-    for i, weight in enumerate(state.weights):
-        pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_weights_{i}.csv")
-    for i, bias in enumerate(state.biases):
-        if bias is not None:
-            pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_biases_{i}.csv")
+    if SAVED_MODEL_PICKLE_MODE:
+        with open(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%.model", 'wb') as f:
+            pickle.dump(state, f)
+    else:
+        for i, weight in enumerate(state.weights):
+            pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_weights_{i}.csv")
+        for i, bias in enumerate(state.biases):
+            if bias is not None:
+                pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_biases_{i}.csv")
+
+
+def load_state(path: Path, net: NeuralNetwork):
+    if SAVED_MODEL_PICKLE_MODE:
+        pickle_model_file = glob(f"{path}/best_state*.model")
+        if len(pickle_model_file) != 1:
+            raise Exception("Expected only one pickle model file to be found")
+        pickle_model_file = pickle_model_file[0]
+        with open(pickle_model_file, 'rb') as f:
+            state: TrainingStateData = pickle.load(f)
+            print(f"Loaded state: {state}")
+            net.set_weights_and_biases(state.weights, state.biases)
+    else:
+        weight_files = sorted(glob(f"{path}/best_state*weights*.csv"))
+        biases_files = sorted(glob(f"{path}/best_state*biases*.csv"))
+        for i, weights_file in enumerate(weight_files):
+            df = pd.read_csv(weights_file)
+            data = df.iloc[:, 1:].to_numpy()
+            net.weights[i] = data
+
+        for i, bias in enumerate(net.biases):
+            if bias is None:
+                continue
+
+            df = pd.read_csv(biases_files[i - 1])
+            data = df.iloc[:, 1:].to_numpy().flatten()
+            net.biases[i] = data
 
 
 def get_subset(train_data, train_correct, count):
@@ -271,10 +286,8 @@ def main():
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
-        print(f"Taking best values from {TRAINED_NET_DIR}")
-        weight_files = sorted(glob(f"{TRAINED_NET_DIR}/best_state*weights*.csv"))
-        biases_files = sorted(glob(f"{TRAINED_NET_DIR}/best_state*biases*.csv"))
-        net.load_weights_and_biases(weight_files, biases_files)
+        print(f"Taking best values from {TRAINED_NET_DIR}. Pickle mode = {SAVED_MODEL_PICKLE_MODE}")
+        load_state(TRAINED_NET_DIR, net)
 
     if SHOULD_TRAIN:
         print(f"Reading training data from: {train_csv}")
@@ -327,7 +340,7 @@ def main():
 
         print("Done!")
         print("Saving results, weights and biases...")
-        output_path.mkdir()
+        output_path.mkdir(exist_ok=True)
         shutil.copy2("config.py", output_path)
         with open(output_path / "results.csv", 'w', newline='') as f:
             writer = csv.writer(f)
@@ -354,8 +367,8 @@ def main():
         df.insert(0, "", prediction_list)
         df.to_csv(output_path/"test_filled.csv")
 
-
         print(prediction_list)
+
 
 if __name__ == '__main__':
     main()

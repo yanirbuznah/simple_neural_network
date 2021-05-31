@@ -11,7 +11,7 @@ RANDRANGE = 0.04
 LEARNING_RATE = 0.003
 
 # Training Configuration
-EPOCH_COUNT = 1
+EPOCH_COUNT = 100
 INPUT_LAYER_NOISE_PROB = 0.2
 SUBSET_SIZE = -1
 ADAPTIVE_LEARNING_RATE_MODE = AdaptiveLearningRateMode.FORMULA
@@ -23,7 +23,8 @@ ADAPTIVE_LEARNING_RATE_DICT = {
         50: 0.0001
 }
 
-SHOULD_TRAIN = False
+SHOULD_TRAIN = True
 
-TRAINED_NET_DIR = "55e8906a-70c2-4fd6-9ffd-a261e305a4a1"  # Put None if you don't want to load a result dir
+SAVED_MODEL_PICKLE_MODE = True  # Put False to use csv files, True to use pickle
+TRAINED_NET_DIR = None  # Put None if you don't want to load a result dir
 
