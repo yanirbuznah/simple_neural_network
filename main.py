@@ -319,7 +319,7 @@ def main():
             if ADAPTIVE_LEARNING_RATE_MODE == AdaptiveLearningRateMode.FORMULA:
                 net.lr = ADAPTIVE_LEARNING_RATE_FORMULA(epoch)
             elif ADAPTIVE_LEARNING_RATE_MODE == AdaptiveLearningRateMode.PREDEFINED_DICT:
-                net.lr = ADAPTIVE_LEARNING_RATE_DICT.get(epoch, default=net.lr)
+                net.lr = ADAPTIVE_LEARNING_RATE_DICT.get(epoch, net.lr)
             else:
                 raise NotImplementedError("Unknown adaptive learning rate mode")
 
@@ -368,6 +368,10 @@ def main():
         df.to_csv(output_path/"test_filled.csv")
 
         print(prediction_list)
+        print("TODO: REMOVE ME")
+        print("Testing results...")
+        import result_compare
+        result_compare.check_results(prediction_list)
 
 
 if __name__ == '__main__':
