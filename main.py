@@ -1,5 +1,6 @@
 import csv
 import shutil
+import signal
 import smtplib
 import ssl
 import sys
@@ -16,6 +17,8 @@ import pickle
 from config import *
 
 np.random.seed(SEED)
+
+SHOULD_STOP = False
 
 class TrainingStateData(object):
     def __init__(self, correct_percent, epoch, weights, biases):
@@ -278,6 +281,15 @@ def separate_data(data, correct):
     np.split(correct,1000)
     return data,correct
 
+
+def interrupt_handler(sig, frame):
+    answer = input("\nAre you sure you want to stop? [y/N]")
+    if answer == "y":
+        global SHOULD_STOP
+        SHOULD_STOP = True
+        print("Will stop at the end of the current epoch")
+
+
 def main():
     if len(sys.argv) < 3:
         print("Not enough arguments")
@@ -297,11 +309,16 @@ def main():
 
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
+    if not TRAINED_NET_DIR:
+        print(f"Will write output to {output_path}")
+
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
         print(f"Taking best values from {TRAINED_NET_DIR}. Pickle mode = {SAVED_MODEL_PICKLE_MODE}")
         load_state(TRAINED_NET_DIR, net)
 
     if SHOULD_TRAIN:
+        signal.signal(signal.SIGINT, interrupt_handler)
+
         print(f"Reading training data from: {train_csv}")
 
         # TO TAKE FROM CSV
@@ -318,6 +335,10 @@ def main():
         overall_best_state = TrainingStateData(0, 0, net.weights, net.biases)
 
         for epoch in range(EPOCH_COUNT):
+            if SHOULD_STOP:
+                print("Training interrupt requested. Stopping")
+                break
+
             if ADAPTIVE_LEARNING_RATE_MODE == AdaptiveLearningRateMode.FORMULA:
                 net.lr = ADAPTIVE_LEARNING_RATE_FORMULA(epoch)
             elif ADAPTIVE_LEARNING_RATE_MODE == AdaptiveLearningRateMode.PREDEFINED_DICT:
