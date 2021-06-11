@@ -331,6 +331,7 @@ def main():
             if TAKE_BEST_FROM_VALIDATE:
                 print("Take best from epoch:", overall_best_state.epoch, "with accuracy", overall_best_state.accuracy,"%")
                 net.weights = overall_best_state.weights
+                net.biases = overall_best_state.biases
 
             if INPUT_LAYER_NOISE_PROB > 0:
                 print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
