@@ -50,5 +50,7 @@ SHOULD_TRAIN = True
 SAVED_MODEL_PICKLE_MODE = True  # Put False to use csv files, True to use pickle
 TRAINED_NET_DIR = None  # Put None if you don't want to load a result dir
 
+TAKE_BEST_FROM_TRAIN = True
 TAKE_BEST_FROM_VALIDATE = True
+
 SEPARATE_VALIDATE = True

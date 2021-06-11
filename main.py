@@ -20,15 +20,16 @@ np.random.seed(SEED)
 
 SHOULD_STOP = False
 
-class TrainingStateData(object):
-    def __init__(self, correct_percent, epoch, weights, biases):
-        self.accuracy = correct_percent
+class EpochStateData(object):
+    def __init__(self, current_validate_accuracy,current_train_accuracy, epoch, weights, biases):
+        self.validate_accuracy = current_validate_accuracy
+        self.train_accuracy = current_train_accuracy
         self.epoch = epoch
         self.weights = self.deep_copy_list_of_np_arrays(weights)
         self.biases = self.deep_copy_list_of_np_arrays(biases)
 
     def __str__(self):
-        return f"Epoch: {self.epoch}\nAccuracy: {self.accuracy}%"
+        return f"Epoch {self.epoch}\nTrain accuracy: {self.train_accuracy}% and Validate accuracy: {self.validate_accuracy}%"
 
     @staticmethod
     def deep_copy_list_of_np_arrays(l: List[np.array]):
@@ -206,7 +207,7 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
         return data[:count], results[:count]
 
 
-def save_state(path: Path, prefix, state: TrainingStateData):
+def save_state(path: Path, prefix, state: EpochStateData):
     if SAVED_MODEL_PICKLE_MODE:
         with open(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%.model", 'wb') as f:
             pickle.dump(state, f)
@@ -225,7 +226,7 @@ def load_state(path: Path, net: NeuralNetwork):
             raise Exception("Expected only one pickle model file to be found")
         pickle_model_file = pickle_model_file[0]
         with open(pickle_model_file, 'rb') as f:
-            state: TrainingStateData = pickle.load(f)
+            state: EpochStateData = pickle.load(f)
             print(f"Loaded state: {state}")
             net.set_weights_and_biases(state.weights, state.biases)
     else:
@@ -332,7 +333,7 @@ def main():
         print("Starting training...")
 
         current_validate_accuracy = 0
-        overall_best_state = TrainingStateData(0, 0, net.weights, net.biases)
+        overall_best_state = EpochStateData(0, 0, 0, net.weights, net.biases)
 
         for epoch in range(EPOCH_COUNT):
             if SHOULD_STOP:
@@ -349,8 +350,8 @@ def main():
             print(f"Epoch {epoch}")
             print(f"Current LR: {net.lr}")
 
-            if TAKE_BEST_FROM_VALIDATE:
-                print("Take best from epoch:", overall_best_state.epoch, "with accuracy", overall_best_state.accuracy,"%")
+            if TAKE_BEST_FROM_VALIDATE or TAKE_BEST_FROM_TRAIN:
+                print("Take best from:", overall_best_state)
                 net.weights = overall_best_state.weights
                 net.biases = overall_best_state.biases
 
@@ -375,9 +376,15 @@ def main():
 
             csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
 
-            if current_validate_accuracy > overall_best_state.accuracy:
-                overall_best_state = TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases)
-
+            if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
+                if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
+                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
+            elif TAKE_BEST_FROM_TRAIN:
+                if current_train_accuracy > overall_best_state.train_accuracy:
+                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
+            elif TAKE_BEST_FROM_VALIDATE:
+                if current_validate_accuracy > overall_best_state.validate_accuracy:
+                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
         print("Done!")
         print("Saving results, weights and biases...")
 
@@ -385,7 +392,7 @@ def main():
             writer = csv.writer(f)
             writer.writerows(csv_results)
 
-        save_state(output_path, "latest_state", TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases))
+        save_state(output_path, "latest_state", EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases))
         save_state(output_path, "best_state", overall_best_state)
 
         #mail_content = f"Finished!\nbest state:\n {overall_best_state}\n CONFIG:\n{open('config.py', 'r').read()}"
