@@ -15,7 +15,7 @@ import pickle
 
 from config import *
 
-np.random.seed(6)
+np.random.seed(SEED)
 
 class TrainingStateData(object):
     def __init__(self, correct_percent, epoch, weights, biases):
@@ -271,6 +271,13 @@ def send_mail(mail, message):
         server.sendmail(sender_email, mail, msg.as_string())
 
 
+def separate_data(data, correct):
+    #data = data.random.suffle(data)
+    #correct = correct.random.suffle(correct)
+    np.split(data,1000)
+    np.split(correct,1000)
+    return data,correct
+
 def main():
     if len(sys.argv) < 3:
         print("Not enough arguments")
@@ -283,6 +290,11 @@ def main():
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
+    validate_data, validate_correct = csv_to_data(validate_csv)
+#    if SEPARATE_VALIDATE:
+#       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
+
+
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
@@ -294,21 +306,11 @@ def main():
 
         # TO TAKE FROM CSV
         train_data, train_correct = csv_to_data(train_csv)
-
+        output_path.mkdir(exist_ok=True)
+        shutil.copy2("config.py", output_path)
         # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
 
-        if INPUT_LAYER_NOISE_PROB > 0:
-            print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
-            train_data = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
-
-        if SUBSET_SIZE > 0:
-            subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
-            net.train_set(list(zip(subset_train, subset_correct)), shuffle=True)
-        else:
-            net.train_set(list(zip(train_data, train_correct)), shuffle=True)
-
-        validate_data, validate_correct = csv_to_data(validate_csv)
 
         print("Starting training...")
 
@@ -325,7 +327,23 @@ def main():
 
             print(f"Epoch {epoch}")
             print(f"Current LR: {net.lr}")
-            net.train_set(list(zip(train_data, train_correct)), shuffle=True)
+
+            if TAKE_BEST_FROM_VALIDATE:
+                print("Take best from epoch:", overall_best_state.epoch, "with accuracy", overall_best_state.accuracy,"%")
+                net.weights = overall_best_state.weights
+
+            if INPUT_LAYER_NOISE_PROB > 0:
+                print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
+                train_data = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
+
+            if SUBSET_SIZE > 0:
+                subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
+                net.train_set(list(zip(subset_train, subset_correct)), shuffle=True)
+            else:
+                net.train_set(list(zip(train_data, train_correct)), shuffle=True)
+
+            #validate_data, validate_correct = csv_to_data(validate_csv)
+
 
             print("======= Train Accuracy =======")
             current_train_accuracy, train_certainty = net.validate_set(list(zip(train_data, train_correct)))
@@ -340,8 +358,7 @@ def main():
 
         print("Done!")
         print("Saving results, weights and biases...")
-        output_path.mkdir(exist_ok=True)
-        shutil.copy2("config.py", output_path)
+
         with open(output_path / "results.csv", 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(csv_results)
@@ -349,9 +366,9 @@ def main():
         save_state(output_path, "latest_state", TrainingStateData(current_validate_accuracy, epoch, net.weights, net.biases))
         save_state(output_path, "best_state", overall_best_state)
 
-        mail_content = f"Finished!\nbest state:\n {overall_best_state}\n CONFIG:\n{open('config.py', 'r').read()}"
-        send_mail("yanirbuznah@gmail.com", mail_content)
-        send_mail("ron.evenm@gmail.com", mail_content)
+        #mail_content = f"Finished!\nbest state:\n {overall_best_state}\n CONFIG:\n{open('config.py', 'r').read()}"
+        #send_mail("yanirbuznah@gmail.com", mail_content)
+        #send_mail("ron.evenm@gmail.com", mail_content)
 
     if test_csv:
         print("Test csv provided. Classifying...")
@@ -368,6 +385,7 @@ def main():
         df.to_csv(output_path/"test_filled.csv")
 
         print(prediction_list)
+        print(output_path)
         print("TODO: REMOVE ME")
         print("Testing results...")
         import result_compare
