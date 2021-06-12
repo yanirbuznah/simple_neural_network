@@ -67,7 +67,8 @@ class NeuralNetwork(object):
         self.randrange = randrange
 
         self.weights = [np.random.uniform(-randrange, randrange, (y.size, x.size)) for x, y in zip(self.layers[1:], self.layers[:-1])]
-        self.biases = [np.random.randn(y.size) if self.input_layer.index < y.index < self.output_layer.index else None for y in self.layers]
+#        self.biases = [np.random.randn(y.size) if self.input_layer.index < y.index < self.output_layer.index else None for y in self.layers]
+        self.biases = [np.zeros(y.size) if self.input_layer.index < y.index < self.output_layer.index else None for y in self.layers]
 
         self.activation_function = activation_function
         self.lr = learning_rate
@@ -209,14 +210,14 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
 
 def save_state(path: Path, prefix, state: EpochStateData):
     if SAVED_MODEL_PICKLE_MODE:
-        with open(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%.model", 'wb') as f:
+        with open(path / f"{prefix}_epoch={state.epoch}_train:{state.train_accuracy}%_validate:{state.validate_accuracy}%.model", 'wb') as f:
             pickle.dump(state, f)
     else:
         for i, weight in enumerate(state.weights):
-            pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_weights_{i}.csv")
+            pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_train:{state.train_accuracy}%_validate:{state.validate_accuracy}%_weights_{i}.csv")
         for i, bias in enumerate(state.biases):
             if bias is not None:
-                pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_{state.accuracy}%_biases_{i}.csv")
+                pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_train:{state.train_accuracy}%_validate:{state.validate_accuracy}%_biases_{i}.csv")
 
 
 def load_state(path: Path, net: NeuralNetwork):
@@ -299,6 +300,8 @@ def main():
     train_csv = sys.argv[1]
     validate_csv = sys.argv[2]
     test_csv = sys.argv[3] if len(sys.argv) >= 4 else None
+    current_train_accuracy=0
+    epoch=0
 
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]

@@ -3,7 +3,7 @@ import numpy as np
 from common import ActivationFunction, AdaptiveLearningRateMode
 
 # Neural Network Configuration
-SEED = 5
+SEED = 789
 INPUT_LAYER_SIZE = 3072
 HIDDEN_LAYERS_SIZES = [1000, 1000]
 OUTPUT_LAYER_SIZE = 10
@@ -12,11 +12,11 @@ RANDRANGE = 0.035
 LEARNING_RATE = 0.003
 
 # Training Configuration
-EPOCH_COUNT = 50
+EPOCH_COUNT = 300
 INPUT_LAYER_NOISE_PROB = 0
 SUBSET_SIZE = 1000
 ADAPTIVE_LEARNING_RATE_MODE = AdaptiveLearningRateMode.PREDEFINED_DICT
-ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.005 * epoch)
+ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
 # ADAPTIVE_LEARNING_RATE_DICT = {
 #         10: 0.009,
 #         20: 0.008,
@@ -40,10 +40,11 @@ ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.005 * epoch)
 #         450: 0.001
 # }
 ADAPTIVE_LEARNING_RATE_DICT = {
-        10: 0.002,
-        20: 0.0015,
-        30: 0.001,
-        50: 0.0005
+        #10: 0.002,
+        100: 0.002,
+        150: 0.001,
+        250: 0.0005
+        #45: 0.0005
 }
 SHOULD_TRAIN = True
 
