@@ -210,7 +210,7 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
 
 def save_state(path: Path, prefix, state: EpochStateData):
     if SAVED_MODEL_PICKLE_MODE:
-        with open(path / f"{prefix}_epoch={state.epoch}_train:{state.train_accuracy}%_validate:{state.validate_accuracy}%.model", 'wb') as f:
+        with open(path / f"{prefix}epoch={state.epoch}_train{state.train_accuracy}%_validate{state.validate_accuracy}% .model", 'wb') as f:
             pickle.dump(state, f)
     else:
         for i, weight in enumerate(state.weights):
@@ -355,8 +355,8 @@ def main():
 
             if TAKE_BEST_FROM_VALIDATE or TAKE_BEST_FROM_TRAIN:
                 print("Take best from:", overall_best_state)
-                net.weights = overall_best_state.weights
-                net.biases = overall_best_state.biases
+                net.weights = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.weights)
+                net.biases = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.biases)
 
             if INPUT_LAYER_NOISE_PROB > 0:
                 print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
@@ -380,14 +380,16 @@ def main():
             csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
 
             if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
-                if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
+                if current_validate_accuracy +current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
+                #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
-            elif TAKE_BEST_FROM_VALIDATE:
+            else:
                 if current_validate_accuracy > overall_best_state.validate_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
+
         print("Done!")
         print("Saving results, weights and biases...")
 
