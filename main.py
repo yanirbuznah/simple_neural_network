@@ -253,6 +253,7 @@ def get_subset(train_data, train_correct, count):
 
 
 def apply_noise(train_data, prob):
+    after_noise_data = EpochStateData.deep_copy_list_of_np_arrays(train_data)
     for i in train_data:
         indices = np.random.choice(np.arange(i.size), replace=False,
                                    size=int(i.size * prob))
@@ -358,15 +359,22 @@ def main():
                 net.weights = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.weights)
                 net.biases = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.biases)
 
-            if INPUT_LAYER_NOISE_PROB > 0:
-                print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
-                train_data = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
+
 
             if SUBSET_SIZE > 0:
                 subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
+                if INPUT_LAYER_NOISE_PROB > 0:
+                    print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
+                    subset_train = apply_noise(subset_train, INPUT_LAYER_NOISE_PROB)
                 net.train_set(list(zip(subset_train, subset_correct)), shuffle=True)
+
             else:
-                net.train_set(list(zip(train_data, train_correct)), shuffle=True)
+                if INPUT_LAYER_NOISE_PROB > 0:
+                    print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
+                    after_noise_train = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
+                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=True)
+                else:
+                    net.train_set(list(zip(train_data, train_correct)), shuffle=True)
 
             #validate_data, validate_correct = csv_to_data(validate_csv)
 
