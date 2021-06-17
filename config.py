@@ -12,9 +12,10 @@ RANDRANGE = 0.035
 LEARNING_RATE = 0.003
 
 # Training Configuration
-EPOCH_COUNT = 500
-INPUT_LAYER_NOISE_PROB = 0.1
-SUBSET_SIZE = 1000
+EPOCH_COUNT = 100
+INPUT_LAYER_NOISE_PROB = 0
+SUBSET_SIZE = -1
+MINI_BATCH_SIZE = 30
 ADAPTIVE_LEARNING_RATE_MODE = AdaptiveLearningRateMode.PREDEFINED_DICT
 ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
 # ADAPTIVE_LEARNING_RATE_DICT = {
@@ -28,24 +29,24 @@ ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
 #         80: 0.002,
 #         90: 0.001
 # }
-ADAPTIVE_LEARNING_RATE_DICT = {
-        50: 0.009,
-        100: 0.008,
-        150: 0.007,
-        200: 0.006,
-        250: 0.005,
-        300: 0.004,
-        350: 0.003,
-        400: 0.002,
-        450: 0.001
-}
 # ADAPTIVE_LEARNING_RATE_DICT = {
-#         10: 0.002,
-#         #100: 0.002,
-#         20: 0.001,
-#         30: 0.0005
-#         #45: 0.0005
+#         50: 0.009,
+#         100: 0.008,
+#         150: 0.007,
+#         200: 0.006,
+#         250: 0.005,
+#         300: 0.004,
+#         350: 0.003,
+#         400: 0.002,
+#         450: 0.001
 # }
+ADAPTIVE_LEARNING_RATE_DICT = {
+        10: 0.002,
+        20: 0.001,
+        30: 0.0005,
+        60: 0.0004,
+        80: 0.0003
+}
 SHOULD_TRAIN = True
 
 SAVED_MODEL_PICKLE_MODE = True  # Put False to use csv files, True to use pickle

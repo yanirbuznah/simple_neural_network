@@ -1,4 +1,5 @@
 import csv
+import pprint
 import shutil
 import signal
 import smtplib
@@ -14,6 +15,7 @@ import pandas as pd
 import numpy as np
 import pickle
 
+import config
 from config import *
 
 np.random.seed(SEED)
@@ -90,18 +92,28 @@ class NeuralNetwork(object):
             values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]) + bias)
             layer.feed(values)
 
-    def train_set(self, data_sets: List[Tuple[np.array, np.array]], shuffle=False):
+    @staticmethod
+    def _chunks(lst, n):
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+
+    def train_set(self, data_sets: List[Tuple[np.array, np.array]], shuffle=False, mini_batch_size=1):
         if shuffle:
             np.random.shuffle(data_sets)
 
-        for index, (sample, expected_result) in enumerate(data_sets):
+        batches = self._chunks(data_sets, mini_batch_size)
 
-            if index % 10 == 0:
+        count = 0
+        for batch in batches:
+            count += len(batch)
+            samples_list, expected_results_list = zip(*batch)
+            if count % 10 == 0:
                 print('\r', end='')
-                print(f"{index}/{len(data_sets)}", end='')
+                print(f"{count}/{len(data_sets)}", end='')
 
-            self._train_sample(sample, expected_result)
-        print("\rFinish training")
+            self._train_mini_batch(samples_list, expected_results_list)
+
+        print("\rFinished training")
 
     def validate_set(self, data_sets: List[Tuple[np.array, np.array]]):
         correct = 0
@@ -124,10 +136,17 @@ class NeuralNetwork(object):
         self.weights = weights
         self.biases = biases
 
-    def _train_sample(self, input_values: np.array, correct_output: np.array):
-        self._clear_feeded_values()
-        self._feed_forward(input_values)
-        errors = self._calculate_errors(correct_output)
+    def _train_mini_batch(self, input_values_list: List[np.array], correct_output_list: List[np.array]):
+        errors = []
+        for input_values, correct_output in zip(input_values_list, correct_output_list):
+            self._clear_feeded_values()
+            self._feed_forward(input_values)
+            current_errors = self._calculate_errors(correct_output)
+            if not errors:
+                errors = current_errors
+            else:
+                errors = [sum(l) for l in zip(errors, current_errors)]
+
         self._update_weights(errors)
 
     def classify_sample(self, input_values: np.array):
@@ -254,11 +273,11 @@ def get_subset(train_data, train_correct, count):
 
 def apply_noise(train_data, prob):
     after_noise_data = EpochStateData.deep_copy_list_of_np_arrays(train_data)
-    for i in train_data:
+    for i in after_noise_data:
         indices = np.random.choice(np.arange(i.size), replace=False,
                                    size=int(i.size * prob))
         i[indices] = 0
-    return train_data
+    return after_noise_data
 
 
 def send_mail(mail, message):
@@ -302,15 +321,17 @@ def main():
     validate_csv = sys.argv[2]
     test_csv = sys.argv[3] if len(sys.argv) >= 4 else None
     current_train_accuracy=0
-    epoch=0
+    epoch = 0
+
+    print(" ======== Config ==========")
+    pprint.pprint(list([(k, v) for (k, v) in config.__dict__.items() if k.isupper()]))
+    print(" ==========================")
 
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
-    validate_data, validate_correct = csv_to_data(validate_csv)
 #    if SEPARATE_VALIDATE:
 #       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
-
 
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
@@ -322,14 +343,17 @@ def main():
         load_state(TRAINED_NET_DIR, net)
 
     if SHOULD_TRAIN:
+        output_path.mkdir(exist_ok=True)
+        shutil.copy2("config.py", output_path)
+
+        validate_data, validate_correct = csv_to_data(validate_csv)
+
         signal.signal(signal.SIGINT, interrupt_handler)
 
         print(f"Reading training data from: {train_csv}")
 
         # TO TAKE FROM CSV
         train_data, train_correct = csv_to_data(train_csv)
-        output_path.mkdir(exist_ok=True)
-        shutil.copy2("config.py", output_path)
         # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
 
@@ -359,22 +383,20 @@ def main():
                 net.weights = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.weights)
                 net.biases = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.biases)
 
-
-
             if SUBSET_SIZE > 0:
                 subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
                 if INPUT_LAYER_NOISE_PROB > 0:
                     print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
                     subset_train = apply_noise(subset_train, INPUT_LAYER_NOISE_PROB)
-                net.train_set(list(zip(subset_train, subset_correct)), shuffle=True)
+                net.train_set(list(zip(subset_train, subset_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
 
             else:
                 if INPUT_LAYER_NOISE_PROB > 0:
                     print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
                     after_noise_train = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
-                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=True)
+                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
                 else:
-                    net.train_set(list(zip(train_data, train_correct)), shuffle=True)
+                    net.train_set(list(zip(train_data, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
 
             #validate_data, validate_correct = csv_to_data(validate_csv)
 
@@ -388,13 +410,13 @@ def main():
             csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
 
             if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
-                if current_validate_accuracy +current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
+                if current_validate_accuracy + current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
                 #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
-            else:
+            elif TAKE_BEST_FROM_VALIDATE:
                 if current_validate_accuracy > overall_best_state.validate_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
 
