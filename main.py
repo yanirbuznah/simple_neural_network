@@ -110,10 +110,12 @@ class NeuralNetwork(object):
             if count % 10 == 0:
                 print('\r', end='')
                 print(f"{count}/{len(data_sets)}", end='')
+                sys.stdout.flush()
 
             self._train_mini_batch(samples_list, expected_results_list)
 
         print("\rFinished training")
+        sys.stdout.flush()
 
     def validate_set(self, data_sets: List[Tuple[np.array, np.array]]):
         correct = 0
