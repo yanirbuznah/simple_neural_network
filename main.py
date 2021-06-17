@@ -89,7 +89,7 @@ class NeuralNetwork(object):
         for layer in self.hidden_layers + [self.output_layer]:
             prev_layer_index = layer.index - 1
             bias = self.biases[layer.index] if self.biases[layer.index] is not None else np.zeros(layer.size)
-            values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]) + bias)
+            values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]) - bias)
             layer.feed(values)
 
     @staticmethod
@@ -139,17 +139,22 @@ class NeuralNetwork(object):
         self.biases = biases
 
     def _train_mini_batch(self, input_values_list: List[np.array], correct_output_list: List[np.array]):
-        errors = []
+        weight_errors = []
+        bias_errors = []
         for input_values, correct_output in zip(input_values_list, correct_output_list):
             self._clear_feeded_values()
             self._feed_forward(input_values)
-            current_errors = self._calculate_errors(correct_output)
-            if not errors:
-                errors = current_errors
+            current_weight_errors, current_bias_errors = self._back_propagation(correct_output)
+            if not weight_errors:
+                weight_errors = current_weight_errors
             else:
-                errors = [sum(l) for l in zip(errors, current_errors)]
+                weight_errors = [sum(l) for l in zip(weight_errors, current_weight_errors)]
+            if not bias_errors:
+                bias_errors = current_bias_errors
+            else:
+                bias_errors = [sum(l) for l in zip(bias_errors, current_bias_errors)]
 
-        self._update_weights(errors)
+        self._update_weights(weight_errors, bias_errors)
 
     def classify_sample(self, input_values: np.array):
         self._clear_feeded_values()
@@ -163,20 +168,28 @@ class NeuralNetwork(object):
         #print(prediction, correct, f"Certainty: {self.output_layer.feeded_values[prediction]}")
         return correct == prediction, self.output_layer.feeded_values[prediction]
 
-    def _calculate_errors(self, correct_output: np.array):
-        errors = []
+    def _back_propagation(self, correct_output: np.array):
+        errors_weights = []
         prev_layer_error = correct_output - self.output_layer.feeded_values
-        errors.insert(0, prev_layer_error)
+        errors_weights.insert(0, prev_layer_error)
         for layer in self.layers[:-1][::-1]:
-            prev_layer_error = errors[0]
+            prev_layer_error = errors_weights[0]
             weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * self.activation_function.d(layer.feeded_values)
-            errors.insert(0, weighted_error)
+            errors_weights.insert(0, weighted_error)
 
-        return errors
+        errors_biases = []
+        for error in errors_weights:
+            errors_biases.append(np.sum(error, axis=0))
 
-    def _update_weights(self, errors: List[np.array]):
+        return errors_weights, errors_biases
+
+    def _update_weights(self, weight_errors: List[np.array], bias_errors: List[np.array]):
         for layer in self.layers[:-1][::-1]:
-            self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(self.activation_function.f(layer.feeded_values), errors[layer.index + 1])
+            self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(self.activation_function.f(layer.feeded_values), weight_errors[layer.index + 1])
+        for layer in self.layers:
+            if self.biases[layer.index] is None:
+                continue
+            self.biases[layer.index] = self.biases[layer.index] + self.lr * np.outer(self.activation_function.f(layer.feeded_values), bias_errors[layer.index + 1]).reshape(self.biases[layer.index].shape)
 
     def __str__(self):
         return f"Net[layers={','.join([str(layer.size) for layer in self.layers])}_randrange={self.randrange}]"
