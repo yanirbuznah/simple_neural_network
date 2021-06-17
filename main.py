@@ -304,6 +304,11 @@ def separate_data(data, correct):
     return data,correct
 
 
+def save_predictions(path, prediction_list):
+    with open(path, 'w') as f:
+        f.writelines([str(p) for p in prediction_list])
+
+
 def interrupt_handler(sig, frame):
     answer = input("\nAre you sure you want to stop? [y/N]")
     if answer == "y":
@@ -416,7 +421,7 @@ def main():
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
-            elif TAKE_BEST_FROM_VALIDATE:
+            else:
                 if current_validate_accuracy > overall_best_state.validate_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
 
@@ -436,17 +441,36 @@ def main():
 
     if test_csv:
         print("Test csv provided. Classifying...")
-        train_data, _ = csv_to_data(test_csv)
+        test_data, _ = csv_to_data(test_csv)
+
         prediction_list = []
-        for i, data in enumerate(train_data):
+        for i, data in enumerate(test_data):
             classification = net.classify_sample(data) + 1
             prediction_list.append(classification)
 
-        print("Saving predicted test.csv")
-        df = pd.read_csv(test_csv, header=None)
-        df.drop(columns=0, inplace=True)
-        df.insert(0, "", prediction_list)
-        df.to_csv(output_path/"test_filled.csv")
+        print("Saving predicted latest_test.txt")
+        save_predictions("latest_test.txt", prediction_list)
+
+        print(prediction_list)
+        print(output_path)
+        print("TODO: REMOVE ME")
+        print("Testing results...")
+        import result_compare
+        result_compare.check_results(prediction_list)
+
+
+
+
+
+        prediction_list = []
+        net.set_weights_and_biases(overall_best_state.weights, overall_best_state.biases)
+        for i, data in enumerate(test_data):
+            classification = net.classify_sample(data) + 1
+            prediction_list.append(classification)
+
+        print("Saving predicted best_test.txt")
+
+        save_predictions("best_test.txt", prediction_list)
 
         print(prediction_list)
         print(output_path)
