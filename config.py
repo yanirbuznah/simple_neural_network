@@ -3,7 +3,7 @@ import numpy as np
 from common import ActivationFunction, AdaptiveLearningRateMode
 
 # Neural Network Configuration
-SEED = 78594329
+SEED = 785
 INPUT_LAYER_SIZE = 3072
 HIDDEN_LAYERS_SIZES = [1000,1000]
 OUTPUT_LAYER_SIZE = 10
@@ -14,8 +14,8 @@ LEARNING_RATE = 0.003
 # Training Configuration
 EPOCH_COUNT = 100
 INPUT_LAYER_NOISE_PROB = 0
-SUBSET_SIZE = -1
-MINI_BATCH_SIZE = 30
+SUBSET_SIZE = 8000
+MINI_BATCH_SIZE = 32
 ADAPTIVE_LEARNING_RATE_MODE = AdaptiveLearningRateMode.PREDEFINED_DICT
 ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
 # ADAPTIVE_LEARNING_RATE_DICT = {
@@ -53,6 +53,6 @@ SAVED_MODEL_PICKLE_MODE = True  # Put False to use csv files, True to use pickle
 TRAINED_NET_DIR = None  # Put None if you don't want to load a result dir
 
 TAKE_BEST_FROM_TRAIN = False
-TAKE_BEST_FROM_VALIDATE = True
+TAKE_BEST_FROM_VALIDATE = False
 
 SEPARATE_VALIDATE = True

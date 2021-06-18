@@ -23,13 +23,11 @@ np.random.seed(SEED)
 SHOULD_STOP = False
 
 class EpochStateData(object):
-    def __init__(self, current_validate_accuracy,current_train_accuracy, epoch, weights, biases):
+    def __init__(self, current_validate_accuracy,current_train_accuracy, epoch, weights):
         self.validate_accuracy = current_validate_accuracy
         self.train_accuracy = current_train_accuracy
         self.epoch = epoch
         self.weights = self.deep_copy_list_of_np_arrays(weights)
-        self.biases = self.deep_copy_list_of_np_arrays(biases)
-
     def __str__(self):
         return f"Epoch {self.epoch}\nTrain accuracy: {self.train_accuracy}% and Validate accuracy: {self.validate_accuracy}%"
 
@@ -46,16 +44,26 @@ class EpochStateData(object):
 
 
 class NeuralLayer(object):
-    def __init__(self, size: int, index: int):
-        self.size = size
+    def __init__(self, size: int, index: int,with_bias):
         self.index = index
-        self.feeded_values = np.zeros(size)
+        self.bias = with_bias
+        self.size = size
+        if  with_bias:
+            self.size+=1
+        self.feeded_values = self.clear_feeded_values()
+
 
     def feed(self, values: np.array):
         self.feeded_values += values
+        # make sure that the bias still shut -1
+        if self.bias:
+            self.feeded_values[-1] = -1
 
     def clear_feeded_values(self):
         self.feeded_values = np.zeros(self.size)
+        # update the bias neuron to -1
+        if self.bias:
+            self.feeded_values[-1] = -1
 
     def __repr__(self):
         return self.feeded_values.__repr__()
@@ -63,14 +71,13 @@ class NeuralLayer(object):
 
 class NeuralNetwork(object):
     def __init__(self, input_layer_size: int, hidden_layers_sizes: List[int], output_layer_size: int, activation_function:ActivationFunction, learning_rate=0.001, randrange=0.01):
-        self.input_layer = NeuralLayer(input_layer_size, 0)
-        self.hidden_layers = [NeuralLayer(size, index + 1) for index, size in enumerate(hidden_layers_sizes)]
-        self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes))
+        self.input_layer = NeuralLayer(input_layer_size, 0,True)
+        self.hidden_layers = [NeuralLayer(size, index + 1, True) for index, size in enumerate(hidden_layers_sizes)]
+        self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes),False)
         self.randrange = randrange
 
         self.weights = [np.random.uniform(-randrange, randrange, (y.size, x.size)) for x, y in zip(self.layers[1:], self.layers[:-1])]
-#        self.biases = [np.random.randn(y.size) if self.input_layer.index < y.index < self.output_layer.index else None for y in self.layers]
-        self.biases = [np.zeros(y.size) if self.input_layer.index < y.index < self.output_layer.index else None for y in self.layers]
+
 
         self.activation_function = activation_function
         self.lr = learning_rate
@@ -85,11 +92,12 @@ class NeuralNetwork(object):
 
 
     def _feed_forward(self, input_values: np.array):
+        #input_values = np.append(input_values,0)
         self.input_layer.feed(input_values)
         for layer in self.hidden_layers + [self.output_layer]:
             prev_layer_index = layer.index - 1
-            bias = self.biases[layer.index] if self.biases[layer.index] is not None else np.zeros(layer.size)
-            values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]) + bias)
+
+            values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
             layer.feed(values)
 
     @staticmethod
@@ -134,9 +142,8 @@ class NeuralNetwork(object):
         print(f"Correct: {correction}%")
         return correction, average_certainty
 
-    def set_weights_and_biases(self, weights, biases):
+    def set_weights(self, weights):
         self.weights = weights
-        self.biases = biases
 
     def _train_mini_batch(self, input_values_list: List[np.array], correct_output_list: List[np.array]):
         errors = []
@@ -197,6 +204,7 @@ def result_classifications_to_np_layers(results_classifications: List[int]) -> n
 
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pd.read_csv(path, header=None)
+    df[df.shape[1]]=0
     output = df.loc[:, 0]
     data = df.drop(columns=0).to_numpy()
     results_indexes = output.to_numpy()
@@ -230,42 +238,22 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
 
 
 def save_state(path: Path, prefix, state: EpochStateData):
-    if SAVED_MODEL_PICKLE_MODE:
-        with open(path / f"{prefix}epoch={state.epoch}_train{state.train_accuracy}%_validate{state.validate_accuracy}% .model", 'wb') as f:
-            pickle.dump(state, f)
-    else:
-        for i, weight in enumerate(state.weights):
-            pd.DataFrame(weight).to_csv(path / f"{prefix}_epoch={state.epoch}_train:{state.train_accuracy}%_validate:{state.validate_accuracy}%_weights_{i}.csv")
-        for i, bias in enumerate(state.biases):
-            if bias is not None:
-                pd.DataFrame(bias).to_csv(path / f"{prefix}_epoch={state.epoch}_train:{state.train_accuracy}%_validate:{state.validate_accuracy}%_biases_{i}.csv")
+    with open(path / f"{prefix}epoch={state.epoch}_train{state.train_accuracy}%_validate{state.validate_accuracy}% .model", 'wb') as f:
+        pickle.dump(state, f)
+
+
 
 
 def load_state(path: Path, net: NeuralNetwork):
-    if SAVED_MODEL_PICKLE_MODE:
-        pickle_model_file = glob(f"{path}/best_state*.model")
-        if len(pickle_model_file) != 1:
-            raise Exception("Expected only one pickle model file to be found")
-        pickle_model_file = pickle_model_file[0]
-        with open(pickle_model_file, 'rb') as f:
-            state: EpochStateData = pickle.load(f)
-            print(f"Loaded state: {state}")
-            net.set_weights_and_biases(state.weights, state.biases)
-    else:
-        weight_files = sorted(glob(f"{path}/best_state*weights*.csv"))
-        biases_files = sorted(glob(f"{path}/best_state*biases*.csv"))
-        for i, weights_file in enumerate(weight_files):
-            df = pd.read_csv(weights_file)
-            data = df.iloc[:, 1:].to_numpy()
-            net.weights[i] = data
+    pickle_model_file = glob(f"{path}/best_state*.model")
+    if len(pickle_model_file) != 1:
+        raise Exception("Expected only one pickle model file to be found")
+    pickle_model_file = pickle_model_file[0]
+    with open(pickle_model_file, 'rb') as f:
+        state: EpochStateData = pickle.load(f)
+        print(f"Loaded state: {state}")
+        net.set_weights(state.weights)
 
-        for i, bias in enumerate(net.biases):
-            if bias is None:
-                continue
-
-            df = pd.read_csv(biases_files[i - 1])
-            data = df.iloc[:, 1:].to_numpy().flatten()
-            net.biases[i] = data
 
 
 def get_subset(train_data, train_correct, count):
@@ -368,7 +356,7 @@ def main():
         print("Starting training...")
 
         current_validate_accuracy = 0
-        overall_best_state = EpochStateData(0, 0, 0, net.weights, net.biases)
+        overall_best_state = EpochStateData(0, 0, 0, net.weights)
 
         for epoch in range(EPOCH_COUNT):
             if SHOULD_STOP:
@@ -388,7 +376,7 @@ def main():
             if TAKE_BEST_FROM_VALIDATE or TAKE_BEST_FROM_TRAIN:
                 print("Take best from:", overall_best_state)
                 net.weights = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.weights)
-                net.biases = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.biases)
+
 
             if SUBSET_SIZE > 0:
                 subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
@@ -419,22 +407,22 @@ def main():
             if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
                 if current_validate_accuracy + current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
                 #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
-                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
+                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
-                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
+                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
             else:
                 if current_validate_accuracy > overall_best_state.validate_accuracy:
-                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases)
+                    overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
 
         print("Done!")
-        print("Saving results, weights and biases...")
+        print("Saving results, weights...")
 
         with open(output_path / "results.csv", 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(csv_results)
 
-        save_state(output_path, "latest_state", EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights, net.biases))
+        save_state(output_path, "latest_state", EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights))
         save_state(output_path, "best_state", overall_best_state)
 
         #mail_content = f"Finished!\nbest state:\n {overall_best_state}\n CONFIG:\n{open('config.py', 'r').read()}"
@@ -465,7 +453,7 @@ def main():
 
 
         prediction_list = []
-        net.set_weights_and_biases(overall_best_state.weights, overall_best_state.biases)
+        net.set_weights(overall_best_state.weights)
         for i, data in enumerate(test_data):
             classification = net.classify_sample(data) + 1
             prediction_list.append(classification)
