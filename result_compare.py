@@ -12,4 +12,7 @@ def check_results(predicted_set=None):
         if predicted_set[i] == correct_set[i]:
             correct += 1
 
-    print(f"{correct/float(total)*100}%")
+    result = correct / float(total) * 100
+    print(f"TEST CORRECT: {result}%")
+
+    return result
