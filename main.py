@@ -437,6 +437,9 @@ def main():
             else:
                 if current_validate_accuracy > overall_best_state.validate_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
+            if epoch %25==0:
+                save_state(output_path, f"epoch_{epoch}", EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights))
+                save_state(output_path, f"best_state_until_epoch_{epoch}", overall_best_state)
 
         print("Done!")
         print("Saving results, weights...")
