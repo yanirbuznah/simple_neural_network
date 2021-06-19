@@ -22,12 +22,14 @@ np.random.seed(SEED)
 
 SHOULD_STOP = False
 
+
 class EpochStateData(object):
     def __init__(self, current_validate_accuracy,current_train_accuracy, epoch, weights):
         self.validate_accuracy = current_validate_accuracy
         self.train_accuracy = current_train_accuracy
         self.epoch = epoch
         self.weights = self.deep_copy_list_of_np_arrays(weights)
+
     def __str__(self):
         return f"Epoch {self.epoch}\nTrain accuracy: {self.train_accuracy}% and Validate accuracy: {self.validate_accuracy}%"
 
@@ -48,10 +50,9 @@ class NeuralLayer(object):
         self.index = index
         self.bias = with_bias
         self.size = size
-        if  with_bias:
-            self.size+=1
+        if with_bias:
+            self.size += 1
         self.feeded_values = self.clear_feeded_values()
-
 
     def feed(self, values: np.array):
         self.feeded_values += values
@@ -71,13 +72,12 @@ class NeuralLayer(object):
 
 class NeuralNetwork(object):
     def __init__(self, input_layer_size: int, hidden_layers_sizes: List[int], output_layer_size: int, activation_function:ActivationFunction, learning_rate=0.001, randrange=0.01):
-        self.input_layer = NeuralLayer(input_layer_size, 0,True)
-        self.hidden_layers = [NeuralLayer(size, index + 1, True) for index, size in enumerate(hidden_layers_sizes)]
-        self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes),False)
+        self.input_layer = NeuralLayer(input_layer_size, 0, with_bias=True)
+        self.hidden_layers = [NeuralLayer(size, index + 1, with_bias=True) for index, size in enumerate(hidden_layers_sizes)]
+        self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes), with_bias=False)
         self.randrange = randrange
 
         self.weights = [np.random.uniform(-randrange, randrange, (y.size, x.size)) for x, y in zip(self.layers[1:], self.layers[:-1])]
-
 
         self.activation_function = activation_function
         self.lr = learning_rate
@@ -89,7 +89,6 @@ class NeuralNetwork(object):
     def _clear_feeded_values(self):
         for layer in self.layers:
             layer.clear_feeded_values()
-
 
     def _feed_forward(self, input_values: np.array):
         #input_values = np.append(input_values,0)
@@ -242,8 +241,6 @@ def save_state(path: Path, prefix, state: EpochStateData):
         pickle.dump(state, f)
 
 
-
-
 def load_state(path: Path, net: NeuralNetwork):
     pickle_model_file = glob(f"{path}/best_state*.model")
     if len(pickle_model_file) != 1:
@@ -253,7 +250,6 @@ def load_state(path: Path, net: NeuralNetwork):
         state: EpochStateData = pickle.load(f)
         print(f"Loaded state: {state}")
         net.set_weights(state.weights)
-
 
 
 def get_subset(train_data, train_correct, count):
@@ -307,6 +303,25 @@ def interrupt_handler(sig, frame):
         print("Will stop at the end of the current epoch")
 
 
+BEST_TEST_RESULT = 0
+# TODO: REMOVE BEFORE SUBMITTING
+def run_tests(test_data, net, epoch):
+    global BEST_TEST_RESULT
+    print(f"RUNNING EPOCH {epoch} MODEL ON TEST SET")
+    prediction_list = []
+    for i, data in enumerate(test_data):
+        classification = net.classify_sample(data) + 1
+        prediction_list.append(classification)
+
+    print(prediction_list)
+    print("TODO: REMOVE ME")
+    import result_compare
+    result = result_compare.check_results(prediction_list)
+    if result > BEST_TEST_RESULT:
+        BEST_TEST_RESULT = result
+        print(f"NEW BEST TEST ON EPOCH {epoch} WITH RESULT {result}%")
+
+
 def main():
     if len(sys.argv) < 3:
         print("Not enough arguments")
@@ -336,6 +351,10 @@ def main():
     if TRAINED_NET_DIR and Path(TRAINED_NET_DIR).exists():
         print(f"Taking best values from {TRAINED_NET_DIR}. Pickle mode = {SAVED_MODEL_PICKLE_MODE}")
         load_state(TRAINED_NET_DIR, net)
+
+    if test_csv:
+        print("Test csv provided")
+        test_data, _ = csv_to_data(test_csv)
 
     if SHOULD_TRAIN:
         output_path.mkdir(exist_ok=True)
@@ -401,6 +420,10 @@ def main():
 
             print("======= Validate Accuracy =======")
             current_validate_accuracy, validate_certainty = net.validate_set(list(zip(validate_data, validate_correct)))
+
+            # TODO: REMOVE ME BEFORE SUBMITTING
+            if test_csv:
+                run_tests(test_data, net, epoch)
 
             csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
 
