@@ -5,7 +5,7 @@ from common import ActivationFunction, AdaptiveLearningRateMode
 # Neural Network Configuration
 SEED = 785
 INPUT_LAYER_SIZE = 3072
-HIDDEN_LAYERS_SIZES = [1000,1000]
+HIDDEN_LAYERS_SIZES = [10]
 OUTPUT_LAYER_SIZE = 10
 ACTIVATION_FUNCTION = ActivationFunction.ReLU
 RANDRANGE = 0.035
@@ -13,9 +13,9 @@ LEARNING_RATE = 0.003
 
 # Training Configuration
 EPOCH_COUNT = 100
-INPUT_LAYER_NOISE_PROB = 0
-SUBSET_SIZE = 8000
-MINI_BATCH_SIZE = 32
+INPUT_LAYER_NOISE_PROB = 0.1
+SUBSET_SIZE = -1
+MINI_BATCH_SIZE = 1
 ADAPTIVE_LEARNING_RATE_MODE = AdaptiveLearningRateMode.PREDEFINED_DICT
 ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
 # ADAPTIVE_LEARNING_RATE_DICT = {
@@ -41,11 +41,10 @@ ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.01 * np.exp(-0.01 * epoch)
 #         450: 0.001
 # }
 ADAPTIVE_LEARNING_RATE_DICT = {
-        10: 0.002,
-        20: 0.001,
-        30: 0.0005,
-        60: 0.0004,
-        80: 0.0003
+        30: 0.002,
+        60: 0.001,
+        90: 0.0005
+
 }
 SHOULD_TRAIN = True
 
