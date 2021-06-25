@@ -95,8 +95,11 @@ class NeuralNetwork(object):
         self.input_layer.feed(input_values)
         for layer in self.hidden_layers + [self.output_layer]:
             prev_layer_index = layer.index - 1
+            if SOFTMAX and layer == self.output_layer:
+                values = softmax(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
 
-            values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
+            else:
+                values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
             layer.feed(values)
 
     @staticmethod
