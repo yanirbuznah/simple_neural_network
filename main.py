@@ -235,6 +235,9 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     else:
         return data[:count], results[:count]
 
+def softmax(x):
+    return  np.exp(x)/sum(np.exp(x))
+
 
 def save_state(path: Path, prefix, state: EpochStateData):
     with open(path / f"{prefix}epoch={state.epoch}_train{state.train_accuracy}%_validate{state.validate_accuracy}% .model", 'wb') as f:
@@ -242,7 +245,7 @@ def save_state(path: Path, prefix, state: EpochStateData):
 
 
 def load_state(path: Path, net: NeuralNetwork):
-    pickle_model_file = glob(f"{path}/best_state*.model")
+    pickle_model_file = glob(f"{path}/lat*.model")
     if len(pickle_model_file) != 1:
         raise Exception("Expected only one pickle model file to be found")
     pickle_model_file = pickle_model_file[0]
@@ -280,6 +283,17 @@ def send_mail(mail, message):
     with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
         server.login(sender_email, password)
         server.sendmail(sender_email, mail, msg.as_string())
+
+def shuffle(train_data, train_correct, validate_data, validate_correct):
+    data = np.concatenate((train_data,validate_data))
+    correct = np.concatenate((train_correct,validate_correct))
+    rand_state = np.random.get_state()
+    np.random.shuffle(data)
+    np.random.set_state(rand_state)
+    np.random.shuffle(correct)
+    train_data, validate_data = np.split(data,[8000])
+    train_correct, validate_correct = np.split(correct,[8000])
+    return train_data,train_correct,validate_data,validate_correct
 
 
 def separate_data(data, correct):
@@ -320,6 +334,7 @@ def run_tests(test_data, net, epoch):
     if result > BEST_TEST_RESULT:
         BEST_TEST_RESULT = result
         print(f"NEW BEST TEST ON EPOCH {epoch} WITH RESULT {result}%")
+
 
 
 def main():
@@ -370,7 +385,8 @@ def main():
         train_data, train_correct = csv_to_data(train_csv)
         # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
-
+        if SHOULD_SHUFFLE:
+            train_data,train_correct,validate_data,validate_correct = shuffle(train_data,train_correct,validate_data,validate_correct)
 
         print("Starting training...")
 
@@ -392,7 +408,7 @@ def main():
             print(f"Epoch {epoch}")
             print(f"Current LR: {net.lr}")
 
-            if TAKE_BEST_FROM_VALIDATE or TAKE_BEST_FROM_TRAIN:
+            if (TAKE_BEST_FROM_VALIDATE or TAKE_BEST_FROM_TRAIN) and (overall_best_state.validate_accuracy > 45):
                 print("Take best from:", overall_best_state)
                 net.weights = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.weights)
 
@@ -411,8 +427,6 @@ def main():
                     net.train_set(list(zip(after_noise_train, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
                 else:
                     net.train_set(list(zip(train_data, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
-
-            #validate_data, validate_correct = csv_to_data(validate_csv)
 
 
             print("======= Train Accuracy =======")
@@ -473,9 +487,6 @@ def main():
         print("Testing results...")
         import result_compare
         result_compare.check_results(prediction_list)
-
-
-
 
 
         prediction_list = []
