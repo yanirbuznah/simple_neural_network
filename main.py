@@ -10,13 +10,18 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Tuple, List
 from glob import glob
-
-import pandas as pd
-import numpy as np
-import pickle
+import pandas
+import cudf as pd
 
 import config
 from config import *
+
+import cupy as np
+import numpy
+
+import pickle
+
+
 
 np.random.seed(SEED)
 
@@ -106,7 +111,6 @@ class NeuralNetwork(object):
     def _chunks(lst, n):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
-
     def train_set(self, data_sets: List[Tuple[np.array, np.array]], shuffle=False, mini_batch_size=1):
         if shuffle:
             np.random.shuffle(data_sets)
@@ -192,25 +196,38 @@ class NeuralNetwork(object):
 
 
 def result_classifications_to_np_layers(results_classifications: List[int]) -> np.array:
-    results = np.zeros((len(results_classifications), 10))
+    results_classifications = np.asnumpy(results_classifications)
+    results = numpy.zeros((len(results_classifications), 10))
     for i in range(len(results_classifications)):
-        if not str(results_classifications[i]).isdigit():
+        if False and not str(results_classifications[i]).strip(".").isdigit():
             # This is probably a test set. Ignore expected results column
             results = []
             break
 
         results[i][results_classifications[i] - 1] = 1
 
+    results = np.asarray(results)
+    print(results)
+
     return results
 
 
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
-    df = pd.read_csv(path, header=None)
+    df = pandas.read_csv(path, header=None)
     df[df.shape[1]]=0
-    output = df.loc[:, 0]
-    data = df.drop(columns=0).to_numpy()
-    results_indexes = output.to_numpy()
+    output = df.loc[:, 0].to_frame()
+    output = output.astype(np.int64)
+    output = pd.from_pandas(output)
+
+    results_indexes = np.array(output.as_gpu_matrix())
+
+    data = df.drop(columns=0)
+    data = pd.from_pandas(data)
+    data = np.array(data.as_gpu_matrix())
+
     results = result_classifications_to_np_layers(results_indexes)
+
+    print(data)
 
     if count == -1:
         return data, results
@@ -314,10 +331,10 @@ def save_predictions(path, prediction_list):
 
 def interrupt_handler(sig, frame):
     answer = input("\nAre you sure you want to stop? [y/N]")
-    if answer == "y":
-        global SHOULD_STOP
-        SHOULD_STOP = True
-        print("Will stop at the end of the current epoch")
+
+    global SHOULD_STOP
+    SHOULD_STOP = True
+    print("Will stop at the end of the current epoch")
 
 
 BEST_TEST_RESULT = 0
@@ -358,8 +375,8 @@ def main():
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
-#    if SEPARATE_VALIDATE:
-#       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
+    #    if SEPARATE_VALIDATE:
+    #       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
 
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
@@ -427,9 +444,9 @@ def main():
                 if INPUT_LAYER_NOISE_PROB > 0:
                     print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
                     after_noise_train = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
-                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
+                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=False, mini_batch_size=MINI_BATCH_SIZE)
                 else:
-                    net.train_set(list(zip(train_data, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
+                    net.train_set(list(zip(train_data, train_correct)), shuffle=False, mini_batch_size=MINI_BATCH_SIZE)
 
 
             print("======= Train Accuracy =======")
@@ -446,7 +463,7 @@ def main():
 
             if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
                 if current_validate_accuracy + current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
-                #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
+                    #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
