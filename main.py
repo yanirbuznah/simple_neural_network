@@ -23,8 +23,9 @@ import pickle
 
 if USE_GPU:
     import cupy as np
+    np.random.seed(SEED)
 
-np.random.seed(SEED)
+numpy.random.seed(SEED)
 
 SHOULD_STOP = False
 
