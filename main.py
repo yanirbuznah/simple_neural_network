@@ -21,11 +21,12 @@ import numpy as np
 
 import pickle
 
+random.seed(SEED)
+numpy.random.seed(SEED)
+
 if USE_GPU:
     import cupy as np
     np.random.seed(SEED)
-
-numpy.random.seed(SEED)
 
 SHOULD_STOP = False
 
