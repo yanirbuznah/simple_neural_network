@@ -385,6 +385,7 @@ def main():
     if SHOULD_TRAIN:
         output_path.mkdir(exist_ok=True)
         shutil.copy2("config.py", output_path)
+        open(output_path / "seed", "w").write(str(SEED))
 
         validate_data, validate_correct = csv_to_data(validate_csv)
 

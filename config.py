@@ -1,9 +1,11 @@
+import random
+
 import numpy as np
 
 from common import ActivationFunction, AdaptiveLearningRateMode
 
 # Neural Network Configuration
-SEED = 42
+SEED = random.randint(0, 100000000)
 INPUT_LAYER_SIZE = 3072
 HIDDEN_LAYERS_SIZES = [1000,1000]
 OUTPUT_LAYER_SIZE = 10
