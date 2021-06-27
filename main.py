@@ -1,6 +1,5 @@
 import csv
 import pprint
-import random
 import shutil
 import signal
 import smtplib
@@ -12,18 +11,18 @@ from pathlib import Path
 from typing import Tuple, List
 from glob import glob
 
-import pandas
-import cudf as pd
+import numpy
 
 import config
 from config import *
 
-import cupy as np
-import numpy
+import pandas as pd
+import numpy as np
 
 import pickle
 
-
+if USE_GPU:
+    import cupy as np
 
 np.random.seed(SEED)
 
@@ -113,9 +112,10 @@ class NeuralNetwork(object):
     def _chunks(lst, n):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
+
     def train_set(self, data_sets: List[Tuple[np.array, np.array]], shuffle=False, mini_batch_size=1):
         if shuffle:
-            np.random.shuffle(data_sets)
+            numpy.random.shuffle(data_sets)
 
         batches = self._chunks(data_sets, mini_batch_size)
 
@@ -211,24 +211,12 @@ def result_classifications_to_np_layers(results_classifications: List[int]) -> n
 
 
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
-    df = pandas.read_csv(path, header=None)
-    df[df.shape[1]] = 0
-    output = df.loc[:, 0].to_frame()
-    if "?" in output:
-        results = None
-    else:
-        output = output.to_numpy()
-        results = result_classifications_to_np_layers(output)
-        results = results.astype(np.int64)
-        results = np.array(results.as_gpu_matrix())
-
-    data = df.drop(columns=0)
-    data = data.astype(np.int64)
-    data = pd.from_pandas(data)
-    data = np.array(data.as_gpu_matrix())
-
-
-    print(data)
+    df = pd.read_csv(path, header=None)
+    df[df.shape[1]]=0
+    output = df.loc[:, 0]
+    data = df.drop(columns=0).to_numpy()
+    results_indexes = output.to_numpy()
+    results = result_classifications_to_np_layers(results_indexes)
 
     if count == -1:
         return data, results
@@ -305,29 +293,15 @@ def send_mail(mail, message):
         server.login(sender_email, password)
         server.sendmail(sender_email, mail, msg.as_string())
 
-
-def shuffle_train_and_validate(train_data, train_correct, validate_data, validate_correct):
-    train = list(zip(train_data, train_correct))
-    validate = list(zip(validate_data, validate_correct))
-
-    combined = train + validate
-
-    random.shuffle(combined)
-
-    train_set = combined[:8000]
-    validate_set = combined[8000:]
-
-    train_data, train_correct = zip(*train_set)
-    validate_data, validate_correct = zip(*validate_set)
-
-    # data = np.concatenate((train_data,validate_data))
-    # correct = np.concatenate((train_correct,validate_correct))
-    # rand_state = np.random.get_random_state()
-    # np.random.shuffle(data)
-    # np.random.set_random_state(rand_state)
-    # np.random.shuffle(correct)
-    # train_data, validate_data = np.split(data,[8000])
-    # train_correct, validate_correct = np.split(correct,[8000])
+def shuffle(train_data, train_correct, validate_data, validate_correct):
+    data = numpy.concatenate((train_data,validate_data))
+    correct = numpy.concatenate((train_correct,validate_correct))
+    rand_state = numpy.random.get_state()
+    numpy.random.shuffle(data)
+    numpy.random.set_state(rand_state)
+    numpy.random.shuffle(correct)
+    train_data, validate_data = numpy.split(data,[8000])
+    train_correct, validate_correct = numpy.split(correct,[8000])
     return train_data,train_correct,validate_data,validate_correct
 
 
@@ -346,10 +320,10 @@ def save_predictions(path, prediction_list):
 
 def interrupt_handler(sig, frame):
     answer = input("\nAre you sure you want to stop? [y/N]")
-
-    global SHOULD_STOP
-    SHOULD_STOP = True
-    print("Will stop at the end of the current epoch")
+    if answer == "y":
+        global SHOULD_STOP
+        SHOULD_STOP = True
+        print("Will stop at the end of the current epoch")
 
 
 BEST_TEST_RESULT = 0
@@ -390,8 +364,8 @@ def main():
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
-    #    if SEPARATE_VALIDATE:
-    #       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
+#    if SEPARATE_VALIDATE:
+#       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
 
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 
@@ -405,6 +379,9 @@ def main():
     if test_csv:
         print("Test csv provided")
         test_data, _ = csv_to_data(test_csv)
+        if USE_GPU:
+            print("Converting test array to GPU array")
+            test_data = np.array(test_data)
 
     if SHOULD_TRAIN:
         output_path.mkdir(exist_ok=True)
@@ -421,7 +398,14 @@ def main():
         # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
         if SHOULD_SHUFFLE:
-            train_data,train_correct,validate_data,validate_correct = shuffle_train_and_validate(train_data, train_correct, validate_data, validate_correct)
+            train_data,train_correct,validate_data,validate_correct = shuffle(train_data,train_correct,validate_data,validate_correct)
+
+        if USE_GPU:
+            print("Converting arrays to GPU arrays")
+            train_data = np.array(train_data)
+            train_correct = np.array(train_correct)
+            validate_data = np.array(validate_data)
+            validate_correct = np.array(validate_correct)
 
         print("Starting training...")
 
@@ -459,9 +443,9 @@ def main():
                 if INPUT_LAYER_NOISE_PROB > 0:
                     print(f"Applying noise of {INPUT_LAYER_NOISE_PROB * 100}% on all inputs")
                     after_noise_train = apply_noise(train_data, INPUT_LAYER_NOISE_PROB)
-                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=False, mini_batch_size=MINI_BATCH_SIZE)
+                    net.train_set(list(zip(after_noise_train, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
                 else:
-                    net.train_set(list(zip(train_data, train_correct)), shuffle=False, mini_batch_size=MINI_BATCH_SIZE)
+                    net.train_set(list(zip(train_data, train_correct)), shuffle=True, mini_batch_size=MINI_BATCH_SIZE)
 
 
             print("======= Train Accuracy =======")
@@ -478,7 +462,7 @@ def main():
 
             if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
                 if current_validate_accuracy + current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
-                    #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
+                #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
@@ -507,6 +491,9 @@ def main():
     if test_csv:
         print("Test csv provided. Classifying...")
         test_data, _ = csv_to_data(test_csv)
+        if USE_GPU:
+            print("Converting test array to GPU array")
+            test_data = np.array(test_data)
 
         prediction_list = []
         for i, data in enumerate(test_data):
