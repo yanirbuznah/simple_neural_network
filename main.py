@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Tuple, List
 from glob import glob
+
 import pandas
 import cudf as pd
 
@@ -307,9 +308,9 @@ def send_mail(mail, message):
 def shuffle(train_data, train_correct, validate_data, validate_correct):
     data = np.concatenate((train_data,validate_data))
     correct = np.concatenate((train_correct,validate_correct))
-    rand_state = np.random.get_state()
+    rand_state = np.random.get_random_state()
     np.random.shuffle(data)
-    np.random.set_state(rand_state)
+    np.random.set_random_state(rand_state)
     np.random.shuffle(correct)
     train_data, validate_data = np.split(data,[8000])
     train_correct, validate_correct = np.split(correct,[8000])
