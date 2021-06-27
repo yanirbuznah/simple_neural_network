@@ -102,10 +102,11 @@ class NeuralNetwork(object):
         for layer in self.hidden_layers + [self.output_layer]:
             prev_layer_index = layer.index - 1
             if SOFTMAX and layer == self.output_layer:
-                values = softmax(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
-
+                f = softmax
             else:
-                values = self.activation_function.f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
+                f = self.activation_function.f
+
+            values = f(np.dot(self.layers[prev_layer_index].feeded_values, self.weights[prev_layer_index]))
             layer.feed(values)
 
     @staticmethod
@@ -183,15 +184,24 @@ class NeuralNetwork(object):
         prev_layer_error = correct_output - self.output_layer.feeded_values
         errors.insert(0, prev_layer_error)
         for layer in self.layers[:-1][::-1]:
+            if SOFTMAX and layer == self.output_layer:
+                d = softmax_d
+            else:
+                d = self.activation_function.d
+
             prev_layer_error = errors[0]
-            weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * self.activation_function.d(layer.feeded_values)
+            weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * d(layer.feeded_values)
             errors.insert(0, weighted_error)
 
         return errors
 
     def _update_weights(self, errors: List[np.array]):
         for layer in self.layers[:-1][::-1]:
-            self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(self.activation_function.f(layer.feeded_values), errors[layer.index + 1])
+            if SOFTMAX and layer == self.output_layer:
+                f = softmax
+            else:
+                f = self.activation_function.f
+            self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(f(layer.feeded_values), errors[layer.index + 1])
 
     def __str__(self):
         return f"Net[layers={','.join([str(layer.size) for layer in self.layers])}_randrange={self.randrange}]"
@@ -244,8 +254,15 @@ def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     else:
         return data[:count], results[:count]
 
+
 def softmax(x):
     return  np.exp(x)/sum(np.exp(x))
+
+
+def softmax_d(x):
+    # Reshape the 1-d softmax to 2-d so that np.dot will do the matrix multiplication
+    s = x.reshape(-1,1)
+    return np.diagflat(s) - np.dot(s, s.T)
 
 
 def save_state(path: Path, prefix, state: EpochStateData):
