@@ -1,5 +1,6 @@
 import csv
 import pprint
+import random
 import shutil
 import signal
 import smtplib
@@ -197,36 +198,35 @@ class NeuralNetwork(object):
 
 
 def result_classifications_to_np_layers(results_classifications: List[int]) -> np.array:
-    results_classifications = np.asnumpy(results_classifications)
     results = numpy.zeros((len(results_classifications), 10))
     for i in range(len(results_classifications)):
-        if False and not str(results_classifications[i]).strip(".").isdigit():
+        if not str(results_classifications[i]).isdigit():
             # This is probably a test set. Ignore expected results column
             results = []
             break
 
         results[i][results_classifications[i] - 1] = 1
 
-    results = np.asarray(results)
-    print(results)
-
     return results
 
 
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pandas.read_csv(path, header=None)
-    df[df.shape[1]]=0
+    df[df.shape[1]] = 0
     output = df.loc[:, 0].to_frame()
-    output = output.astype(np.int64)
-    output = pd.from_pandas(output)
-
-    results_indexes = np.array(output.as_gpu_matrix())
+    if "?" in output:
+        results = None
+    else:
+        output = output.to_numpy()
+        results = result_classifications_to_np_layers(output)
+        results = results.astype(np.int64)
+        results = np.array(results.as_gpu_matrix())
 
     data = df.drop(columns=0)
+    data = data.astype(np.int64)
     data = pd.from_pandas(data)
     data = np.array(data.as_gpu_matrix())
 
-    results = result_classifications_to_np_layers(results_indexes)
 
     print(data)
 
@@ -305,15 +305,29 @@ def send_mail(mail, message):
         server.login(sender_email, password)
         server.sendmail(sender_email, mail, msg.as_string())
 
-def shuffle(train_data, train_correct, validate_data, validate_correct):
-    data = np.concatenate((train_data,validate_data))
-    correct = np.concatenate((train_correct,validate_correct))
-    rand_state = np.random.get_random_state()
-    np.random.shuffle(data)
-    np.random.set_random_state(rand_state)
-    np.random.shuffle(correct)
-    train_data, validate_data = np.split(data,[8000])
-    train_correct, validate_correct = np.split(correct,[8000])
+
+def shuffle_train_and_validate(train_data, train_correct, validate_data, validate_correct):
+    train = list(zip(train_data, train_correct))
+    validate = list(zip(validate_data, validate_correct))
+
+    combined = train + validate
+
+    random.shuffle(combined)
+
+    train_set = combined[:8000]
+    validate_set = combined[8000:]
+
+    train_data, train_correct = zip(*train_set)
+    validate_data, validate_correct = zip(*validate_set)
+
+    # data = np.concatenate((train_data,validate_data))
+    # correct = np.concatenate((train_correct,validate_correct))
+    # rand_state = np.random.get_random_state()
+    # np.random.shuffle(data)
+    # np.random.set_random_state(rand_state)
+    # np.random.shuffle(correct)
+    # train_data, validate_data = np.split(data,[8000])
+    # train_correct, validate_correct = np.split(correct,[8000])
     return train_data,train_correct,validate_data,validate_correct
 
 
@@ -407,7 +421,7 @@ def main():
         # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
         if SHOULD_SHUFFLE:
-            train_data,train_correct,validate_data,validate_correct = shuffle(train_data,train_correct,validate_data,validate_correct)
+            train_data,train_correct,validate_data,validate_correct = shuffle_train_and_validate(train_data, train_correct, validate_data, validate_correct)
 
         print("Starting training...")
 
