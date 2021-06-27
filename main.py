@@ -336,7 +336,6 @@ def run_tests(test_data, net, epoch):
         classification = net.classify_sample(data) + 1
         prediction_list.append(classification)
 
-    print(prediction_list)
     print("TODO: REMOVE ME")
     import result_compare
     result = result_compare.check_results(prediction_list)
