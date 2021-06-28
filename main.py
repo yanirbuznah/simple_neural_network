@@ -60,7 +60,7 @@ class NeuralLayer(object):
         self.size = size
         if with_bias:
             self.size += 1
-        self.feeded_values = self.clear_feeded_values()
+        self.clear_feeded_values()
 
     def feed(self, values: np.array):
         self.feeded_values += values
