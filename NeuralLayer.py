@@ -34,12 +34,16 @@ class NeuralLayer(object):
         self.index = index
         self.bias = with_bias
         self.size = size
+        self.mask = np.random.binomial(1, 1-DROP_OUT, size=self.size) / (1-DROP_OUT)
         if with_bias:
             self.size += 1
         self.clear_feeded_values()
 
     def feed(self, values: np.array):
         self.feeded_values += values
+        if DROP_OUT:
+            self.feeded_values*= self.mask
+
         # make sure that the bias still shut -1
         if self.bias:
             self.feeded_values[-1] = -1

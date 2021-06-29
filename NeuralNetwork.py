@@ -139,7 +139,7 @@ class NeuralNetwork(object):
                 d = self.activation_function.d
 
             prev_layer_error = errors[0]
-            weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * d(layer.feeded_values)
+            weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * d(layer.feeded_values) * layer.mask
             errors.insert(0, weighted_error)
 
         return errors
