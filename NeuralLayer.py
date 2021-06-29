@@ -42,6 +42,7 @@ class NeuralLayer(object):
     def feed(self, values: np.array):
         self.feeded_values += values
         if DROP_OUT:
+            self.mask = np.random.binomial(1, 1-DROP_OUT, size=self.size) / (1-DROP_OUT)
             self.feeded_values*= self.mask
 
         # make sure that the bias still shut -1
