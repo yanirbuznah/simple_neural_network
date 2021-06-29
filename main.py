@@ -167,7 +167,7 @@ def interrupt_handler(sig, frame):
 
 BEST_TEST_RESULT = 0
 # TODO: REMOVE BEFORE SUBMITTING
-def run_tests(test_data, net, epoch):
+def run_tests(test_data, net, epoch,output_path,current_validate_accuracy, current_train_accuracy):
     global BEST_TEST_RESULT
     print(f"RUNNING EPOCH {epoch} MODEL ON TEST SET")
     prediction_list = []
@@ -181,6 +181,7 @@ def run_tests(test_data, net, epoch):
     if result > BEST_TEST_RESULT:
         BEST_TEST_RESULT = result
         print(f"NEW BEST TEST ON EPOCH {epoch} WITH RESULT {result}%")
+        save_state(output_path, f"best_test_until_epoch_{epoch}_with_{result}_",EpochStateData(current_validate_accuracy, current_train_accuracy,epoch,net.weights))
 
 
 
@@ -295,7 +296,7 @@ def main():
 
             # TODO: REMOVE ME BEFORE SUBMITTING
             if test_csv:
-                run_tests(test_data, net, epoch)
+                run_tests(test_data, net, epoch,output_path,current_validate_accuracy, current_train_accuracy)
 
             csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
 
@@ -309,7 +310,7 @@ def main():
             else:
                 if current_validate_accuracy > overall_best_state.validate_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
-            if epoch %25==0:
+            if epoch % 50 == 0:
                 save_state(output_path, f"epoch_{epoch}", EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights))
                 save_state(output_path, f"best_state_until_epoch_{epoch}", overall_best_state)
 

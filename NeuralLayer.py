@@ -1,15 +1,3 @@
-import csv
-import pprint
-import shutil
-import signal
-import smtplib
-import ssl
-import sys
-import uuid
-from email.mime.text import MIMEText
-from pathlib import Path
-from typing import Tuple, List
-from glob import glob
 
 import numpy
 
@@ -34,14 +22,13 @@ class NeuralLayer(object):
         self.index = index
         self.bias = with_bias
         self.size = size
-        self.mask = np.random.binomial(1, 1-DROP_OUT, size=self.size) / (1-DROP_OUT)
         if with_bias:
             self.size += 1
         self.clear_feeded_values()
 
     def feed(self, values: np.array):
         self.feeded_values += values
-        if DROP_OUT:
+        if DROP_OUT and self.index != 0:
             self.mask = np.random.binomial(1, 1-DROP_OUT, size=self.size) / (1-DROP_OUT)
             self.feeded_values*= self.mask
 
