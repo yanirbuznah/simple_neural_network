@@ -18,18 +18,20 @@ SHOULD_STOP = False
 
 
 class NeuralLayer(object):
-    def __init__(self, size: int, index: int,with_bias):
+    def __init__(self, size: int, index: int,with_bias, dropout):
         self.index = index
         self.bias = with_bias
         self.size = size
+        self.dropout = dropout
+        self.mask = np.random.binomial(1, 1-dropout, size=self.size) / (1-dropout)
         if with_bias:
             self.size += 1
         self.clear_feeded_values()
 
     def feed(self, values: np.array):
         self.feeded_values += values
-        if DROP_OUT and self.index != 0:
-            self.mask = np.random.binomial(1, 1-DROP_OUT, size=self.size) / (1-DROP_OUT)
+        if self.dropout > 0:
+            self.mask = np.random.binomial(1, 1-self.dropout, size=self.size) / (1-self.dropout)
             self.feeded_values*= self.mask
 
         # make sure that the bias still shut -1

@@ -26,10 +26,10 @@ SHOULD_STOP = False
 from NeuralLayer import NeuralLayer
 
 class NeuralNetwork(object):
-    def __init__(self, input_layer_size: int, hidden_layers_sizes: List[int], output_layer_size: int, activation_function:ActivationFunction, learning_rate=0.001, randrange=0.01):
-        self.input_layer = NeuralLayer(input_layer_size, 0, with_bias=True)
-        self.hidden_layers = [NeuralLayer(size, index + 1, with_bias=True) for index, size in enumerate(hidden_layers_sizes)]
-        self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes), with_bias=False)
+    def __init__(self, input_layer_size: int, hidden_layers_sizes: List[int], output_layer_size: int, activation_function:ActivationFunction,hidden_layer_dropout:List[float], learning_rate=0.001, randrange=0.01):
+        self.input_layer = NeuralLayer(input_layer_size, 0, with_bias=True,dropout=0)
+        self.hidden_layers = [NeuralLayer(size, index + 1, with_bias=True,dropout=hidden_layer_dropout[index+1]) for index, size in enumerate(hidden_layers_sizes)]
+        self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes), with_bias=False,dropout=0)
         self.randrange = randrange
 
         self.weights = [np.random.uniform(-randrange, randrange, (y.size, x.size)) for x, y in zip(self.layers[1:], self.layers[:-1])]
@@ -139,10 +139,7 @@ class NeuralNetwork(object):
                 d = self.activation_function.d
 
             prev_layer_error = errors[0]
-            if DROP_OUT>0 and layer!= self.output_layer:
-                weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * d(layer.feeded_values) * layer.mask
-            else:
-                weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * d(layer.feeded_values)
+            weighted_error = np.dot(prev_layer_error, self.weights[layer.index].T) * d(layer.feeded_values)
 
             errors.insert(0, weighted_error)
 

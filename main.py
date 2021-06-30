@@ -200,7 +200,7 @@ def main():
     pprint.pprint(list([(k, v) for (k, v) in config.__dict__.items() if k.isupper()]))
     print(" ==========================")
 
-    net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE)
+    net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE, hidden_layer_dropout=DROP_OUT)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
 
 #    if SEPARATE_VALIDATE:
