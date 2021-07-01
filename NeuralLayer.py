@@ -1,20 +1,9 @@
-
-import numpy
-
-import config
 from config import *
 
 import numpy as np
 
-random.seed(SEED)
-numpy.random.seed(SEED)
-
 if USE_GPU:
     import cupy as np
-    np.random.seed(SEED)
-
-SHOULD_STOP = False
-
 
 
 class NeuralLayer(object):
@@ -32,7 +21,7 @@ class NeuralLayer(object):
         self.feeded_values += values
         if self.dropout > 0:
             self.mask = np.random.binomial(1, 1-self.dropout, size=self.size) / (1-self.dropout)
-            self.feeded_values*= self.mask
+            self.feeded_values *= self.mask
 
         # make sure that the bias still shut -1
         if self.bias:
