@@ -1,5 +1,19 @@
 # simple_neural_network
-## dependencies:
+
+A simple implimention of neural network from scratch, using numpy cupy and pandas. 
+## Getting started:
+### Installing
+Download the zip for this repository or use git on the termianl. The terminal command is:
+```
+git clone https://github.com/yanirbuznah/simple_neural_network.git
+```
+After clonning the project, run the following command : 
+```
+python main.py <train.csv> <validate.csv> <test.csv>
+```
+(<*.csv> refers to path)<br/>
+To run the network after training, use the configuration file.
+### dependencies:
 - [pandas](https://pandas.pydata.org/).
 - [numpy](https://numpy.org/).
 - [cupy](https://cupy.dev/) (only if run on gpu).
