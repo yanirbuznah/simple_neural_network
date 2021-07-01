@@ -1,5 +1,9 @@
 # simple_neural_network
-## configuration file:
+## dependencies:
+- [pandas](https://pandas.pydata.org/).
+- [numpy](https://numpy.org/).
+- [cupy](https://cupy.dev/) (only if run on gpu).
+## Configuration file:
 - SEED = The seed for the random functions, use random.randint(0, 100000000) to randomly seed (the network will save the seed in a separate file)
 - INPUT_LAYER_SIZE = The size of the input layer
 - HIDDEN_LAYERS_SIZES = A list of hidden layer sizes, for example [1000,100] will create a first layer with 1000 neurons and a second layer with 100
