@@ -92,7 +92,7 @@ def save_state(path: Path, prefix, state: EpochStateData):
     if USE_GPU:
         print("Run was with GPU. Converting state back to numpy before saving")
         weights = [cupy.asnumpy(w) for w in state.weights]
-        state.weights = weights
+        state = EpochStateData(state.validate_accuracy, state.train_accuracy, state.epoch, weights)
 
     with open(path / f"{prefix}epoch={state.epoch}_train{state.train_accuracy}%_validate{state.validate_accuracy}% .model", 'wb') as f:
         pickle.dump(state, f)
