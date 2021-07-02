@@ -13,13 +13,13 @@ python main.py <train.csv> <validate.csv> <test.csv>
 ```
 (<*.csv> refers to path)<br/>
 To run the network after training, use the configuration file called `config.py`.
-### dependencies:
+### Dependencies:
 - [pandas](https://pandas.pydata.org/).
 - [numpy](https://numpy.org/).
 - [cupy](https://cupy.dev/) (only if run on gpu).
 ## Configuration file:
 
-- `SEED` = The seed for the random functions, use `random.randint(0, 100000000)` to randomly seed (the network will save the seed in a separate file)
+- `SEED` = The seed for the random functions, use `random.randint(0, 100000000)` for a random seed (the network will save the seed in a separate file)
   
 
 - `INPUT_LAYER_SIZE` = The size of the input layer
@@ -105,3 +105,11 @@ To run the network after training, use the configuration file called `config.py`
 - `USE_GPU` = 
   - `True` - to use gpu (use cupy library, and cuda gpu, recommended in google colab)
   - `False` - to use cpu only.
+
+
+## Saved model format
+A saved model is a folder containing the following files:
+  - `results.csv` - The training process output (accuracy and certainty observed in each epoch). Can be used to build a training process chart
+  - `seed` - The seed that was used during training 
+  - `config.py` - Configuration file used for the training, just for backup purposes
+  - `*.model` - Trained model state object in pickle format. When running, make sure there is only one model file in the directory

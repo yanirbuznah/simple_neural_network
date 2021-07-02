@@ -22,15 +22,23 @@ import numpy as np
 
 import pickle
 
-random.seed(SEED)
-numpy.random.seed(SEED)
-
 if USE_GPU:
     import cupy
     import cupy as np
-    np.random.seed(SEED)
 
 SHOULD_STOP = False
+
+
+def set_seed(value):
+    random.seed(value)
+    numpy.random.seed(value)
+
+    if USE_GPU:
+        cupy.random.seed(value)
+
+
+# SET THE SEED TO THE SEED FROM CONFIG NOW
+set_seed(SEED)
 
 
 def result_classifications_to_np_layers(results_classifications: List[int]) -> np.array:
@@ -71,7 +79,7 @@ def save_state(path: Path, prefix, state: EpochStateData):
 
 
 def load_state(path: Path, net: NeuralNetwork):
-    pickle_model_file = glob(f"{path}/lat*.model")
+    pickle_model_file = glob(f"{path}/*.model")
     if len(pickle_model_file) != 1:
         raise Exception("Expected only one pickle model file to be found")
     pickle_model_file = pickle_model_file[0]
@@ -85,6 +93,14 @@ def load_state(path: Path, net: NeuralNetwork):
             state.weights = weights
 
         net.set_weights(state.weights)
+
+    seed_file = glob(f"{path}/seed")
+    if len(seed_file) != 1:
+        raise Exception("Seed file wasn't found")
+
+    with open(seed_file, 'r') as f:
+        seed = int(f.read())
+        set_seed(seed)
 
 
 def get_subset(train_data, train_correct, count):
