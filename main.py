@@ -203,12 +203,10 @@ def main():
 
         print(f"Reading training data from: {train_csv}")
 
-        # TO TAKE FROM CSV
         train_data, train_correct = csv_to_data(train_csv)
-        # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
-        #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
+
         if SHOULD_SHUFFLE:
-            train_data,train_correct,validate_data,validate_correct = shuffle(train_data,train_correct,validate_data,validate_correct)
+            train_data, train_correct, validate_data, validate_correct = shuffle(train_data, train_correct, validate_data, validate_correct)
 
         if USE_GPU:
             print("Converting arrays to GPU arrays")
@@ -241,7 +239,6 @@ def main():
                 print("Take best from:", overall_best_state)
                 net.weights = EpochStateData.deep_copy_list_of_np_arrays(overall_best_state.weights)
 
-
             if SUBSET_SIZE > 0:
                 subset_train, subset_correct = get_subset(train_data, train_correct, SUBSET_SIZE)
                 if INPUT_LAYER_NOISE_PROB > 0:
@@ -264,15 +261,10 @@ def main():
             print("======= Validate Accuracy =======")
             current_validate_accuracy, validate_certainty = net.validate_set(list(zip(validate_data, validate_correct)))
 
-            # TODO: REMOVE ME BEFORE SUBMITTING
-            if test_csv:
-                run_tests(test_data, net, epoch,output_path,current_validate_accuracy, current_train_accuracy)
-
             csv_results.append([epoch, net.lr, current_train_accuracy, train_certainty, current_validate_accuracy, validate_certainty])
 
             if TAKE_BEST_FROM_TRAIN and TAKE_BEST_FROM_VALIDATE:
                 if current_validate_accuracy + current_train_accuracy > overall_best_state.train_accuracy + overall_best_state.validate_accuracy:
-                #if current_validate_accuracy >= overall_best_state.validate_accuracy and current_train_accuracy + 2.0 > overall_best_state.train_accuracy:
                     overall_best_state = EpochStateData(current_validate_accuracy, current_train_accuracy, epoch, net.weights)
             elif TAKE_BEST_FROM_TRAIN:
                 if current_train_accuracy > overall_best_state.train_accuracy:
@@ -311,32 +303,7 @@ def main():
             prediction_list.append(classification)
 
         print("Saving predicted latest_test.txt")
-        save_predictions("latest_test.txt", prediction_list)
-
-        print(prediction_list)
-        print(output_path)
-        print("TODO: REMOVE ME")
-        print("Testing results...")
-        import result_compare
-        result_compare.check_results(prediction_list)
-
-
-        prediction_list = []
-        net.set_weights(overall_best_state.weights)
-        for i, data in enumerate(test_data):
-            classification = net.classify_sample(data) + 1
-            prediction_list.append(classification)
-
-        print("Saving predicted best_test.txt")
-
-        save_predictions("best_test.txt", prediction_list)
-
-        print(prediction_list)
-        print(output_path)
-        print("TODO: REMOVE ME")
-        print("Testing results...")
-        import result_compare
-        result_compare.check_results(prediction_list)
+        save_predictions("output.txt", prediction_list)
 
 
 if __name__ == '__main__':
