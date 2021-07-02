@@ -101,7 +101,7 @@ def save_state(path: Path, prefix, state: EpochStateData):
 
 
 def load_state(path: Path, net: NeuralNetwork):
-    pickle_model_file = glob(f"{path}/lat*.model")
+    pickle_model_file = glob(f"{path}/*.model")
     if len(pickle_model_file) != 1:
         raise Exception("Expected only one pickle model file to be found")
     pickle_model_file = pickle_model_file[0]
