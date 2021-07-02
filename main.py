@@ -1,4 +1,5 @@
 import csv
+import os
 import pprint
 import shutil
 import signal
@@ -147,7 +148,7 @@ def shuffle(train_data, train_correct, validate_data, validate_correct):
 
 def save_predictions(path, prediction_list):
     with open(path, 'w') as f:
-        f.writelines([str(p) for p in prediction_list])
+        f.write("\n".join([str(p) for p in prediction_list]))
 
 
 def interrupt_handler(sig, frame):
@@ -302,8 +303,8 @@ def main():
             classification = net.classify_sample(data) + 1
             prediction_list.append(classification)
 
-        print("Saving predicted latest_test.txt")
-        save_predictions("output.txt", prediction_list)
+        print("Saving predicted output.txt")
+        save_predictions(f"{os.path.join(output_path, 'output.txt')}", prediction_list)
 
 
 if __name__ == '__main__':
