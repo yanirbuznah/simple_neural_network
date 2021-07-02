@@ -64,7 +64,8 @@ and change the following parameters:
   - `AdaptiveLearningRateMode.FORMULA` (Decay function configured by `ADAPTIVE_LEARNING_RATE_FORMULA`)
     
 
-- `ADAPTIVE_LEARNING_RATE_FORMULA` = Decay learning rate formula, for example: `lambda epoch: 0.005 * np.exp(-0.0001 * epoch)`
+- `ADAPTIVE_LEARNING_RATE_FORMULA` = Decay learning rate formula, for example:
+```lambda epoch: 0.005 * np.exp(-0.0001 * epoch)```
 
 
 - `ADAPTIVE_LEARNING_RATE_DICT` = Python dictionary with learning rate per epoch (start with `LEARNING_RATE` parameter) , for example: `{20: 0.002, 40: 0.001}`
