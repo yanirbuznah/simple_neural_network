@@ -33,12 +33,6 @@ if USE_GPU:
 SHOULD_STOP = False
 
 
-
-
-
-
-
-
 def result_classifications_to_np_layers(results_classifications: List[int]) -> np.array:
     results = numpy.zeros((len(results_classifications), 10))
     for i in range(len(results_classifications)):
@@ -54,7 +48,7 @@ def result_classifications_to_np_layers(results_classifications: List[int]) -> n
 
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pd.read_csv(path, header=None)
-    df[df.shape[1]]=0
+    df[df.shape[1]] = 0
     output = df.loc[:, 0]
     data = df.drop(columns=0).to_numpy()
     results_indexes = output.to_numpy()
@@ -64,28 +58,6 @@ def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
         return data, results
     else:
         return data[:count], results[:count]
-
-
-def pickle_to_data(path, count=-1) -> Tuple[np.array, np.array]:
-    results_indexes = []
-    data = []
-    pickle_files = sorted(glob(f"{path}/data_batch_*"))
-    for pickle_file in pickle_files:
-        with open(pickle_file, 'rb') as f:
-            data_dict = pickle.load(f, encoding='bytes')
-            results_indexes += data_dict[b'labels']
-            data += [data_dict[b'data']/255]
-
-    result_classifications = [i + 1 for i in results_indexes]
-    results = result_classifications_to_np_layers(result_classifications)
-
-    data = np.concatenate(data)
-
-    if count == -1:
-        return data, results
-    else:
-        return data[:count], results[:count]
-
 
 
 def save_state(path: Path, prefix, state: EpochStateData):
@@ -144,24 +116,17 @@ def send_mail(mail, message):
         server.login(sender_email, password)
         server.sendmail(sender_email, mail, msg.as_string())
 
+
 def shuffle(train_data, train_correct, validate_data, validate_correct):
-    data = numpy.concatenate((train_data,validate_data))
-    correct = numpy.concatenate((train_correct,validate_correct))
+    data = numpy.concatenate((train_data, validate_data))
+    correct = numpy.concatenate((train_correct, validate_correct))
     rand_state = numpy.random.get_state()
     numpy.random.shuffle(data)
     numpy.random.set_state(rand_state)
     numpy.random.shuffle(correct)
-    train_data, validate_data = numpy.split(data,[8000])
-    train_correct, validate_correct = numpy.split(correct,[8000])
-    return train_data,train_correct,validate_data,validate_correct
-
-
-def separate_data(data, correct):
-    #data = data.random.suffle(data)
-    #correct = correct.random.suffle(correct)
-    np.split(data,1000)
-    np.split(correct,1000)
-    return data,correct
+    train_data, validate_data = numpy.split(data, [8000])
+    train_correct, validate_correct = numpy.split(correct, [8000])
+    return train_data, train_correct, validate_data, validate_correct
 
 
 def save_predictions(path, prediction_list):
@@ -177,26 +142,6 @@ def interrupt_handler(sig, frame):
         print("Will stop at the end of the current epoch")
 
 
-BEST_TEST_RESULT = 0
-# TODO: REMOVE BEFORE SUBMITTING
-def run_tests(test_data, net, epoch,output_path,current_validate_accuracy, current_train_accuracy):
-    global BEST_TEST_RESULT
-    print(f"RUNNING EPOCH {epoch} MODEL ON TEST SET")
-    prediction_list = []
-    for i, data in enumerate(test_data):
-        classification = net.classify_sample(data) + 1
-        prediction_list.append(classification)
-
-    print("TODO: REMOVE ME")
-    import result_compare
-    result = result_compare.check_results(prediction_list)
-    if result > BEST_TEST_RESULT:
-        BEST_TEST_RESULT = result
-        print(f"NEW BEST TEST ON EPOCH {epoch} WITH RESULT {result}%")
-        save_state(output_path, f"best_test_until_epoch_{epoch}_with_{result}_",EpochStateData(current_validate_accuracy, current_train_accuracy,epoch,net.weights))
-
-
-
 def main():
     if len(sys.argv) < 3:
         print("Not enough arguments")
@@ -205,7 +150,7 @@ def main():
     train_csv = sys.argv[1]
     validate_csv = sys.argv[2]
     test_csv = sys.argv[3] if len(sys.argv) >= 4 else None
-    current_train_accuracy=0
+    current_train_accuracy = 0
     epoch = 0
 
     print(" ======== Config ==========")
@@ -214,9 +159,6 @@ def main():
 
     net = NeuralNetwork(INPUT_LAYER_SIZE, HIDDEN_LAYERS_SIZES, OUTPUT_LAYER_SIZE, ACTIVATION_FUNCTION, randrange=RANDRANGE, learning_rate=LEARNING_RATE, hidden_layer_dropout=DROP_OUT)
     csv_results = [["epoch", "LR", "train_accuracy", "train_certainty", "validate_accuracy", "validate_certainty"]]
-
-#    if SEPARATE_VALIDATE:
-#       validate_data_array, validate_correct_array = separate_data(validate_data,validate_correct)
 
     output_path = Path(str(uuid.uuid4()) if not TRAINED_NET_DIR else TRAINED_NET_DIR)
 

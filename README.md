@@ -7,12 +7,12 @@ Download the zip for this repository or use git on the termianl. The terminal co
 ```
 git clone https://github.com/yanirbuznah/simple_neural_network.git
 ```
-After clonning the project, run the following command : 
+After cloning the project, run the following command : 
 ```
 python main.py <train.csv> <validate.csv> <test.csv>
 ```
 (<*.csv> refers to path)<br/>
-To run the network after training, use the configuration file.
+To run the network after training, use the configuration file called `config.py`.
 ### dependencies:
 - [pandas](https://pandas.pydata.org/).
 - [numpy](https://numpy.org/).
