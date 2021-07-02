@@ -99,6 +99,8 @@ def load_state(path: Path, net: NeuralNetwork):
     if len(seed_file) != 1:
         raise Exception("Seed file wasn't found")
 
+    seed_file = seed_file[0]
+
     with open(seed_file, 'r') as f:
         seed = int(f.read())
         set_seed(seed)

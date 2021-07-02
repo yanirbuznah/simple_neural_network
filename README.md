@@ -12,11 +12,16 @@ After cloning the project, run the following command :
 python main.py <train.csv> <validate.csv> <test.csv>
 ```
 (<*.csv> refers to path)<br/>
-To run the network after training, use the configuration file called `config.py`.
+To run the network after training, copy the `config.py` file from the saved model directory onto the `config.py` in the main directory,
+and change the following parameters:
+- `TRAINED_NET_DIR = <TRAINED_MODEL_DIR>`
+- `SHOULD_TRAIN = False`
+- Change `USE_GPU` to whether or not the local machine has CUDA support
 ### Dependencies:
 - [pandas](https://pandas.pydata.org/).
 - [numpy](https://numpy.org/).
 - [cupy](https://cupy.dev/) (only if run on gpu).
+
 ## Configuration file:
 
 - `SEED` = The seed for the random functions, use `random.randint(0, 100000000)` for a random seed (the network will save the seed in a separate file)
