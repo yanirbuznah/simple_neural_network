@@ -10,7 +10,7 @@ INPUT_LAYER_SIZE = 3072
 HIDDEN_LAYERS_SIZES = [1000,1000]
 OUTPUT_LAYER_SIZE = 10
 ACTIVATION_FUNCTION = ActivationFunction.ReLU
-RANDRANGE = 0.05
+RANDRANGE = -1
 LEARNING_RATE = 0.0003
 
 # Training Configuration
@@ -52,12 +52,12 @@ ADAPTIVE_LEARNING_RATE_DICT = {
 SHOULD_TRAIN = True
 
 SAVED_MODEL_PICKLE_MODE = True  # Put False to use csv files, True to use pickle
-TRAINED_NET_DIR = None #"ac443d74-364d-412e-b493-a5b9d8e289f6"  # Put None if you don't want to load a result dir
+TRAINED_NET_DIR = None #"weights"# None #"ac443d74-364d-412e-b493-a5b9d8e289f6"  # Put None if you don't want to load a result dir
 
 TAKE_BEST_FROM_TRAIN = False
 TAKE_BEST_FROM_VALIDATE = False
 SHOULD_SHUFFLE = True
 
 SOFTMAX = True
-DROP_OUT = [0.8, 0.8]
-USE_GPU = True
+DROP_OUT = [0, 0]
+USE_GPU = False
