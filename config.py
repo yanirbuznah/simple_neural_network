@@ -5,16 +5,16 @@ import numpy as np
 from common import ActivationFunction, AdaptiveLearningRateMode
 
 # Neural Network Configuration
-SEED = random.randint(0, 100000000)
+SEED = 2074056 #random.randint(0, 100000000)
 INPUT_LAYER_SIZE = 784
-HIDDEN_LAYERS_SIZES = [1000,1000]
+HIDDEN_LAYERS_SIZES = [500,200]
 OUTPUT_LAYER_SIZE = 10
-ACTIVATION_FUNCTION = ActivationFunction.ReLU
+ACTIVATION_FUNCTION = ActivationFunction.Sigmoid
 RANDRANGE = 0.05
-LEARNING_RATE = 0.0003
+LEARNING_RATE = 0.01
 
 # Training Configuration
-EPOCH_COUNT = 201
+EPOCH_COUNT = 26
 INPUT_LAYER_NOISE_PROB = 0
 SUBSET_SIZE = -1
 MINI_BATCH_SIZE = 1
@@ -43,9 +43,9 @@ ADAPTIVE_LEARNING_RATE_FORMULA = lambda epoch: 0.005 * np.exp(-0.0001 * epoch)
 #         450: 0.001
 # }
 ADAPTIVE_LEARNING_RATE_DICT = {
-        20: 0.002,
-        40: 0.001,
-        60: 0.0005,
+        10: 0.009,
+        15: 0.008,
+        20: 0.007,
         80: 0.0004,
         100: 0.0003
 }
@@ -59,5 +59,5 @@ TAKE_BEST_FROM_VALIDATE = False
 SHOULD_SHUFFLE = True
 
 SOFTMAX = True
-DROP_OUT = [0.8, 0.8]
+DROP_OUT = [0,0]
 USE_GPU = False

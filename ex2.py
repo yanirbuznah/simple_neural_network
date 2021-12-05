@@ -46,16 +46,16 @@ def separate_validation(samples, div):
 
 
 def load_all():
-    train_x = "..data/train_x"
-    train_y = "..data/train_y"
-    test_x = "..data/test_x"
+    train_x = "train_x"
+    train_y = "train_y"
+    test_x = "test_x"
 
     train_x = numpy.loadtxt(train_x) / 255
     train_y = numpy.loadtxt(train_y, dtype=numpy.int)
     train_x,train_y = shuffle(train_x,train_y)
     test_x = numpy.loadtxt(test_x) / 255
 
-    res = separate_validation(zip(train_x, train_y), 0.8)
+    res = separate_validation(zip(train_x, train_y), 0.9)
     train_x = res["train_x"]
     train_y = res["train_y"]
     validate_x = res["validate_x"]

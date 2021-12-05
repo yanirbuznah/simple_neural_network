@@ -134,7 +134,7 @@ class NeuralNetwork(object):
                 f = softmax
             else:
                 f = self.activation_function.f
-            self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(f(layer.feeded_values), errors[layer.index + 1])
+            self.weights[layer.index] = self.weights[layer.index] + self.lr * np.outer(layer.feeded_values, errors[layer.index + 1])
 
     def __str__(self):
         return f"Net[layers={','.join([str(layer.size) for layer in self.layers])}_randrange={self.randrange}]"

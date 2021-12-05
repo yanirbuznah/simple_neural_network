@@ -268,10 +268,10 @@ def main():
 
         if USE_GPU:
             print("Converting arrays to GPU arrays")
-            train_data = np.array(train_data)
-            train_correct = np.array(train_correct)
-            validate_data = np.array(validate_data)
-            validate_correct = np.array(validate_correct)
+            train_data = np.array(list(train_data))
+            train_correct = np.array(list(train_correct))
+            validate_data = np.array(list(validate_data))
+            validate_correct = np.array(list(validate_correct))
 
         print("Starting training...")
 
@@ -315,8 +315,8 @@ def main():
 
 
             print("======= Train Accuracy =======")
-            print(train_data)
-            print(train_correct)
+            # print(train_data)
+            # print(train_correct)
             current_train_accuracy, train_certainty = net.validate_set(list(zip(train_data, train_correct)))
 
             print("======= Validate Accuracy =======")
