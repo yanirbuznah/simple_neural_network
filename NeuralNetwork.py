@@ -15,7 +15,6 @@ class NeuralNetwork(object):
         self.hidden_layers = [NeuralLayer(size, index + 1, with_bias=True,dropout=hidden_layer_dropout[index]) for index, size in enumerate(hidden_layers_sizes)]
         self.output_layer = NeuralLayer(output_layer_size, 1 + len(hidden_layers_sizes), with_bias=False,dropout=0)
         self.randrange = randrange
-
         self.weights = [np.random.uniform(-randrange, randrange, (y.size, x.size)) for x, y in zip(self.layers[1:], self.layers[:-1])]
 
         self.activation_function = activation_function
@@ -30,7 +29,7 @@ class NeuralNetwork(object):
             layer.clear_feeded_values()
 
     def _feed_forward(self, input_values: np.array):
-        #input_values = np.append(input_values,0)
+        input_values = np.append(input_values,0)
         self.input_layer.feed(input_values)
         for layer in self.hidden_layers + [self.output_layer]:
             prev_layer_index = layer.index - 1

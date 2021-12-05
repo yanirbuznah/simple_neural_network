@@ -6,7 +6,7 @@ from common import ActivationFunction, AdaptiveLearningRateMode
 
 # Neural Network Configuration
 SEED = random.randint(0, 100000000)
-INPUT_LAYER_SIZE = 3072
+INPUT_LAYER_SIZE = 784
 HIDDEN_LAYERS_SIZES = [1000,1000]
 OUTPUT_LAYER_SIZE = 10
 ACTIVATION_FUNCTION = ActivationFunction.ReLU
@@ -60,4 +60,4 @@ SHOULD_SHUFFLE = True
 
 SOFTMAX = True
 DROP_OUT = [0.8, 0.8]
-USE_GPU = True
+USE_GPU = False

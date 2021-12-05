@@ -26,6 +26,9 @@ if USE_GPU:
     import cupy
     import cupy as np
 
+from ex2 import load_all
+
+
 SHOULD_STOP = False
 
 
@@ -52,7 +55,6 @@ def result_classifications_to_np_layers(results_classifications: List[int]) -> n
         results[i][results_classifications[i] - 1] = 1
 
     return results
-
 
 def csv_to_data(path, count=-1) -> Tuple[np.array, np.array]:
     df = pd.read_csv(path, header=None)
@@ -197,14 +199,14 @@ def run_tests(test_data, net, epoch,output_path,current_validate_accuracy, curre
         classification = net.classify_sample(data) + 1
         prediction_list.append(classification)
 
-    print("TODO: REMOVE ME")
-    import result_compare
-    result = result_compare.check_results(prediction_list)
-    if result > BEST_TEST_RESULT:
-        BEST_TEST_RESULT = result
-        print(f"NEW BEST TEST ON EPOCH {epoch} WITH RESULT {result}%")
-        save_state(output_path, f"best_test_until_epoch_{epoch}_with_{result}_",EpochStateData(current_validate_accuracy, current_train_accuracy,epoch,net.weights))
-
+    # print("TODO: REMOVE ME")
+    # import result_compare
+    # result = result_compare.check_results(prediction_list)
+    # if result > BEST_TEST_RESULT:
+    #     BEST_TEST_RESULT = result
+    #     print(f"NEW BEST TEST ON EPOCH {epoch} WITH RESULT {result}%")
+    #     save_state(output_path, f"best_test_until_epoch_{epoch}_with_{result}_",EpochStateData(current_validate_accuracy, current_train_accuracy,epoch,net.weights))
+    #
 
 
 def main():
@@ -237,9 +239,11 @@ def main():
         print(f"Taking best values from {TRAINED_NET_DIR}. Pickle mode = {SAVED_MODEL_PICKLE_MODE}")
         load_state(TRAINED_NET_DIR, net)
 
+    train_data, train_correct, validate_data, validate_correct, test_data = load_all()
+
     if test_csv:
         print("Test csv provided")
-        test_data, _ = csv_to_data(test_csv)
+        #test_data, _ = csv_to_data(test_csv)
         if USE_GPU:
             print("Converting test array to GPU array")
             test_data = np.array(test_data)
@@ -249,18 +253,18 @@ def main():
         shutil.copy2("config.py", output_path)
         open(output_path / "seed", "w").write(str(SEED))
 
-        validate_data, validate_correct = csv_to_data(validate_csv)
+        #validate_data, validate_correct = csv_to_data(validate_csv)
 
         signal.signal(signal.SIGINT, interrupt_handler)
 
         print(f"Reading training data from: {train_csv}")
 
         # TO TAKE FROM CSV
-        train_data, train_correct = csv_to_data(train_csv)
+        #train_data, train_correct = csv_to_data(train_csv)
         # TO TAKE FROM PICKLE TODO: REMOVE THIS BEFORE SUBMITTING
         #train_data, train_correct = pickle_to_data("cifar-10-batches-py")
-        if SHOULD_SHUFFLE:
-            train_data,train_correct,validate_data,validate_correct = shuffle(train_data,train_correct,validate_data,validate_correct)
+        # if SHOULD_SHUFFLE:
+        #     train_data,train_correct,validate_data,validate_correct = shuffle(train_data,train_correct,validate_data,validate_correct)
 
         if USE_GPU:
             print("Converting arrays to GPU arrays")
@@ -311,6 +315,8 @@ def main():
 
 
             print("======= Train Accuracy =======")
+            print(train_data)
+            print(train_correct)
             current_train_accuracy, train_certainty = net.validate_set(list(zip(train_data, train_correct)))
 
             print("======= Validate Accuracy =======")
@@ -352,7 +358,7 @@ def main():
 
     if test_csv:
         print("Test csv provided. Classifying...")
-        test_data, _ = csv_to_data(test_csv)
+        #test_data, _ = csv_to_data(test_csv)
         if USE_GPU:
             print("Converting test array to GPU array")
             test_data = np.array(test_data)
